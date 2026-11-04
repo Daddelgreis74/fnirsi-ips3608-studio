@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FNIRSI IPS3608 Studio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top Navigation / Connection Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="url(#cyan-grad)" stroke="#00f0ff"/>
+          <defs>
+            <linearGradient id="cyan-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.8"/>
+              <stop offset="100%" stop-color="#00ff88" stop-opacity="0.9"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>FNIRSI IPS3608 <span>STUDIO</span></h1>
+        <span class="version-tag">PRO CONTROL v1.0</span>
+      </div>
+    </div>
+
+    <!-- Center Output Status Indicator -->
+    <div class="header-center">
+      <div id="outputPill" class="output-status-pill status-off">
+        <span class="status-dot"></span>
+        <span id="outputPillText">AUSGANG AUS (STANDBY)</span>
+      </div>
+    </div>
+
+    <!-- Serial Connection Toolbar -->
+    <div class="connection-bar">
+      <div class="sim-toggle-wrapper" title="Simulationsmodus für Tests ohne Hardware">
+        <label class="switch">
+          <input type="checkbox" id="simModeCheckbox">
+          <span class="slider round"></span>
+        </label>
+        <span class="sim-label">Demo</span>
+      </div>
+
+      <div class="port-select-wrapper">
+        <select id="comPortSelect" class="port-select">
+          <option value="">Port wählen / WebSerial...</option>
+        </select>
+        <button id="btnRefreshPorts" class="icon-btn" title="COM-Ports neu scannen">🔄</button>
+      </div>
+
+      <button id="btnConnect" class="btn btn-connect">
+        <span class="btn-icon">⚡</span>
+        <span id="btnConnectText">Verbinden</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Studio Workspace -->
+  <main class="studio-grid">
+    <!-- LEFT: Large Live Telemetry Instruments -->
+    <section class="panel telemetry-panel">
+      <div class="panel-header">
+        <h2>IST-WERTE (TELEMETRIE)</h2>
+        <div class="badge-cluster">
+          <span id="modeBadge" class="badge badge-cv">CV MODUS</span>
+          <span id="tempBadge" class="badge badge-temp">🌡️ --.- °C</span>
+        </div>
+      </div>
+
+      <!-- Giant Digital Meters -->
+      <div class="meters-container">
+        <!-- Voltage -->
+        <div class="meter-card meter-voltage">
+          <div class="meter-meta">
+            <span class="meter-title">SPANNUNG</span>
+            <span class="meter-unit">VOLT</span>
+          </div>
+          <div class="meter-value" id="dispActualVoltage">00.000</div>
+          <div class="meter-bar">
+            <div id="barVoltage" class="bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Current -->
+        <div class="meter-card meter-current">
+          <div class="meter-meta">
+            <span class="meter-title">STROM</span>
+            <span class="meter-unit">AMPERE</span>
+          </div>
+          <div class="meter-value" id="dispActualCurrent">0.0000</div>
+          <div class="meter-bar">
+            <div id="barCurrent" class="bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Power -->
+        <div class="meter-card meter-power">
+          <div class="meter-meta">
+            <span class="meter-title">LEISTUNG</span>
+            <span class="meter-unit">WATT</span>
+          </div>
+          <div class="meter-value" id="dispActualPower">00.00</div>
+          <div class="meter-bar">
+            <div id="barPower" class="bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Secondary Telemetry / Capacity & Protection Flags -->
+      <div class="telemetry-subgrid">
+        <div class="sub-stat">
+          <span class="sub-label">KAPAZITÄT</span>
+          <span id="dispCapacityAh" class="sub-val">0.000 Ah</span>
+        </div>
+        <div class="sub-stat">
+          <span class="sub-label">ENERGIE</span>
+          <span id="dispEnergyWh" class="sub-val">0.000 Wh</span>
+        </div>
+        <div class="sub-stat">
+          <span class="sub-label">ZEIT</span>
+          <span id="dispUptime" class="sub-val">00:00:00</span>
+        </div>
+      </div>
+
+      <!-- Protections Indicators -->
+      <div class="protections-bar">
+        <span id="flagOvp" class="flag-pill">OVP</span>
+        <span id="flagOcp" class="flag-pill">OCP</span>
+        <span id="flagOpp" class="flag-pill">OPP</span>
+        <span id="flagOtp" class="flag-pill">OTP</span>
+        <span id="flagScp" class="flag-pill">KURZSCHLUSS</span>
+      </div>
+    </section>
+
+    <!-- CENTER: Master Power Switch & Setpoint Controls -->
+    <section class="panel control-panel">
+      <!-- Master Big Power Switch Button -->
+      <div class="master-power-wrapper">
+        <button id="btnMasterPower" class="master-power-btn btn-power-off">
+          <div class="power-glow"></div>
+          <div class="power-content">
+            <svg class="power-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
+            </svg>
+            <span id="btnMasterPowerLabel">AUSGANG EINSCHALTEN</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Setpoint Sliders & Steppers -->
+      <div class="setpoints-wrapper">
+        <!-- Target Voltage -->
+        <div class="setpoint-card">
+          <div class="setpoint-head">
+            <span class="label">SOLL-SPANNUNG</span>
+            <div class="input-display">
+              <input type="number" id="inputTargetVoltage" min="0" max="36" step="0.01" value="12.00">
+              <span class="unit">V</span>
+            </div>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="sliderVoltage" min="0" max="36" step="0.01" value="12.00">
+          </div>
+          <div class="steppers-row">
+            <button class="step-btn" data-type="v" data-step="-1.0">-1V</button>
+            <button class="step-btn" data-type="v" data-step="-0.1">-0.1V</button>
+            <button class="step-btn" data-type="v" data-step="+0.1">+0.1V</button>
+            <button class="step-btn" data-type="v" data-step="+1.0">+1V</button>
+          </div>
+        </div>
+
+        <!-- Target Current Limit -->
+        <div class="setpoint-card">
+          <div class="setpoint-head">
+            <span class="label">STROM-LIMIT (MAX)</span>
+            <div class="input-display">
+              <input type="number" id="inputTargetCurrent" min="0" max="8.2" step="0.01" value="2.00">
+              <span class="unit">A</span>
+            </div>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="sliderCurrent" min="0" max="8.2" step="0.01" value="2.00">
+          </div>
+          <div class="steppers-row">
+            <button class="step-btn" data-type="a" data-step="-0.5">-0.5A</button>
+            <button class="step-btn" data-type="a" data-step="-0.05">-0.05A</button>
+            <button class="step-btn" data-type="a" data-step="+0.05">+0.05A</button>
+            <button class="step-btn" data-type="a" data-step="+0.5">+0.5A</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Preset Buttons Grid -->
+      <div class="presets-section">
+        <div class="presets-header">
+          <span>SCHNELLWAHL-PRESETS</span>
+        </div>
+        <div class="preset-grid">
+          <button class="preset-btn" data-v="3.3" data-a="1.0">3.3V / 1A</button>
+          <button class="preset-btn" data-v="5.0" data-a="2.0">5.0V / 2A</button>
+          <button class="preset-btn" data-v="9.0" data-a="1.5">9.0V / 1.5A</button>
+          <button class="preset-btn" data-v="12.0" data-a="3.0">12V / 3A</button>
+          <button class="preset-btn" data-v="15.0" data-a="2.5">15V / 2.5A</button>
+          <button class="preset-btn" data-v="20.0" data-a="3.25">20V / 3.25A</button>
+          <button class="preset-btn" data-v="24.0" data-a="4.0">24V / 4A</button>
+          <button class="preset-btn" data-v="36.0" data-a="8.0">36V / 8A</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT / BOTTOM: Live Waveform Oscilloscope & Session Data Logger -->
+    <section class="panel scope-panel">
+      <div class="panel-header">
+        <div class="scope-legend">
+          <h2>ECHTZEIT-GRAPH (SCOPE)</h2>
+          <span class="legend-item legend-v"><span class="dot"></span> Spannung (V)</span>
+          <span class="legend-item legend-a"><span class="dot"></span> Strom (A)</span>
+        </div>
+        <div class="scope-controls">
+          <label>Zeitfenster:</label>
+          <select id="timebaseSelect" class="timebase-select">
+            <option value="10">10 Sek</option>
+            <option value="30" selected>30 Sek</option>
+            <option value="60">60 Sek</option>
+            <option value="120">2 Min</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 60 FPS HTML5 Canvas Graph -->
+      <div class="canvas-container">
+        <canvas id="scopeCanvas"></canvas>
+      </div>
+
+      <!-- Data Logger Toolbar -->
+      <div class="logger-bar">
+        <div class="logger-status">
+          <button id="btnToggleLog" class="btn btn-record">
+            <span class="rec-dot"></span>
+            <span id="btnRecordText">Aufnahme starten</span>
+          </button>
+          <span id="logCounter" class="log-info">0 Datenpunkte aufgezeichnet</span>
+        </div>
+        <button id="btnExportCsv" class="btn btn-export" disabled>
+          <span>📥 CSV Exportieren</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script src="protocol.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
