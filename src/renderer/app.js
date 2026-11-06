@@ -29,6 +29,16 @@ const state = {
   logging: false,
   logData: [],
   
+  // Protection Status
+  protection: {
+    code: 0,
+    ovp: false,
+    ocp: false,
+    opp: false,
+    otp: false,
+    scp: false
+  },
+
   // Scope Waveform History
   history: [],
   timebaseSeconds: 30
@@ -59,6 +69,13 @@ const elements = {
   dispCapacityAh: document.getElementById('dispCapacityAh'),
   dispEnergyWh: document.getElementById('dispEnergyWh'),
   dispUptime: document.getElementById('dispUptime'),
+
+  // Protection Indicators (Pills)
+  flagOvp: document.getElementById('flagOvp'),
+  flagOcp: document.getElementById('flagOcp'),
+  flagOpp: document.getElementById('flagOpp'),
+  flagOtp: document.getElementById('flagOtp'),
+  flagScp: document.getElementById('flagScp'),
   
   inputTargetVoltage: document.getElementById('inputTargetVoltage'),
   sliderVoltage: document.getElementById('sliderVoltage'),
@@ -182,6 +199,8 @@ async function disconnectSerial() {
   }
 
   updateConnectionUI(false);
+  state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false };
+  updateTelemetryDisplays();
 }
 
 async function readLoop() {
@@ -238,11 +257,24 @@ async function sendFrame(frameBytes) {
 }
 
 let pollTimer = null;
+let pollTick = 0;
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
+  pollTick = 0;
   pollTimer = setInterval(() => {
     if (state.connected && !state.simMode) {
-      sendFrame(IPS3608Protocol.queryLiveValues());
+      pollTick++;
+      // Poll fast telemetry (10 Hz) with interleaved status/protection queries
+      if (pollTick % 4 === 0) {
+        // Full device state (0xFF) delivers protection flags, mode and output state
+        sendFrame(IPS3608Protocol.queryAll());
+      } else if (pollTick % 4 === 2) {
+        // Dedicated protection register query (0xDC)
+        sendFrame(IPS3608Protocol.queryProtection());
+      } else {
+        // Fast 12-byte live values (0xC3)
+        sendFrame(IPS3608Protocol.queryLiveValues());
+      }
     }
   }, 100); // 10 Hz refresh
 }
@@ -297,6 +329,11 @@ function applyTelemetry(data) {
   if (data.temperature !== undefined) state.temperature = data.temperature;
   if (data.outputOn !== undefined) updateOutputState(data.outputOn);
   if (data.mode !== undefined) state.mode = data.mode;
+  if (data.capacityAh !== undefined && data.capacityAh > 0) state.capacityAh = data.capacityAh;
+  if (data.energyWh !== undefined && data.energyWh > 0) state.energyWh = data.energyWh;
+  if (data.protection !== undefined) {
+    state.protection = data.protection;
+  }
 
   updateTelemetryDisplays();
   recordHistoryPoint();
@@ -327,6 +364,14 @@ function updateTelemetryDisplays() {
     const s = String(elapsedSec % 60).padStart(2, '0');
     elements.dispUptime.textContent = `${h}:${m}:${s}`;
   }
+
+  // Protection Pills (OVP, OCP, OPP, OTP, KURZSCHLUSS)
+  const prot = state.protection || {};
+  if (elements.flagOvp) elements.flagOvp.classList.toggle('flag-alert', !!prot.ovp);
+  if (elements.flagOcp) elements.flagOcp.classList.toggle('flag-alert', !!prot.ocp);
+  if (elements.flagOpp) elements.flagOpp.classList.toggle('flag-alert', !!prot.opp);
+  if (elements.flagOtp) elements.flagOtp.classList.toggle('flag-alert', !!prot.otp);
+  if (elements.flagScp) elements.flagScp.classList.toggle('flag-alert', !!prot.scp);
 }
 
 function updateConnectionUI(connected, labelOverride) {
@@ -386,6 +431,12 @@ function setTargetCurrent(a) {
 function toggleMasterOutput() {
   const newState = !state.outputOn;
   updateOutputState(newState);
+
+  if (newState) {
+    // Clear protection alert states when user turns output back on
+    state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false };
+    updateTelemetryDisplays();
+  }
 
   if (state.connected && !state.simMode) {
     sendFrame(IPS3608Protocol.setOutput(newState));
@@ -575,6 +626,31 @@ function initEvents() {
   });
 
   elements.btnExportCsv.addEventListener('click', exportCsv);
+
+  // Interactive Protection Flags (Demo/Simulation mode: click to toggle any protection alert)
+  [
+    { el: elements.flagOvp, key: 'ovp', code: 1 },
+    { el: elements.flagOcp, key: 'ocp', code: 2 },
+    { el: elements.flagOpp, key: 'opp', code: 3 },
+    { el: elements.flagOtp, key: 'otp', code: 4 },
+    { el: elements.flagScp, key: 'scp', code: 5 }
+  ].forEach(({ el, key, code }) => {
+    if (el) {
+      el.style.cursor = 'pointer';
+      el.title = 'Im Demo-Modus anklickbar für Simulation';
+      el.addEventListener('click', () => {
+        if (state.simMode) {
+          const active = !state.protection[key];
+          state.protection[key] = active;
+          state.protection.code = active ? code : 0;
+          if (active) {
+            updateOutputState(false);
+          }
+          updateTelemetryDisplays();
+        }
+      });
+    }
+  });
 
   // Initial port refresh
   refreshPortList();

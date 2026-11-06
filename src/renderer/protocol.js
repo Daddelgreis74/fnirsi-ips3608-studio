@@ -21,7 +21,17 @@ const Register = {
   MODE: 0xDD,
   BRIGHTNESS: 0xD6,
   CAPACITY_AH: 0xD9,
-  CAPACITY_WH: 0xDA
+  CAPACITY_WH: 0xDA,
+  ALL: 0xFF
+};
+
+const ProtectionCode = {
+  OK: 0,
+  OVP: 1, // Over Voltage Protection
+  OCP: 2, // Over Current Protection
+  OPP: 3, // Over Power Protection
+  OTP: 4, // Over Temperature Protection
+  SCP: 5  // Short Circuit Protection (Kurzschluss)
 };
 
 class IPS3608Protocol {
@@ -108,10 +118,24 @@ class IPS3608Protocol {
   }
 
   /**
-   * Command: Poll Live Telemetry
+   * Command: Poll Live Telemetry (12 Bytes: Voltage, Current, Power)
    */
   static queryLiveValues() {
-    return this.buildFrame(CmdType.READ, Register.LIVE_VALUES, new Uint8Array(0));
+    return this.buildFrame(CmdType.READ, Register.LIVE_VALUES, new Uint8Array([0x00]));
+  }
+
+  /**
+   * Command: Poll Protection Status (Register 0xDC)
+   */
+  static queryProtection() {
+    return this.buildFrame(CmdType.READ, Register.PROTECTION, new Uint8Array([0x00]));
+  }
+
+  /**
+   * Command: Poll Full Device Status (Register 0xFF, ~140 Bytes all telemetry)
+   */
+  static queryAll() {
+    return this.buildFrame(CmdType.READ, Register.ALL, new Uint8Array([0x00]));
   }
 
   /**
@@ -176,12 +200,41 @@ class IPS3608Protocol {
     } else if (frame.register === Register.PROTECTION && frame.data.length >= 1) {
       const p = frame.data[0];
       telemetry.protection = {
-        ovp: (p & 0x01) !== 0,
-        ocp: (p & 0x02) !== 0,
-        opp: (p & 0x04) !== 0,
-        otp: (p & 0x08) !== 0,
-        scp: (p & 0x10) !== 0
+        code: p,
+        ovp: p === ProtectionCode.OVP,
+        ocp: p === ProtectionCode.OCP,
+        opp: p === ProtectionCode.OPP,
+        otp: p === ProtectionCode.OTP,
+        scp: p === ProtectionCode.SCP
       };
+    } else if (frame.register === Register.ALL && frame.data.length >= 28) {
+      // Register 0xFF full status frame
+      telemetry.inputVoltage = this.bytesToFloat(frame.data, 0);
+      telemetry.targetVoltage = this.bytesToFloat(frame.data, 4);
+      telemetry.targetCurrent = this.bytesToFloat(frame.data, 8);
+      telemetry.voltage = this.bytesToFloat(frame.data, 12);
+      telemetry.current = this.bytesToFloat(frame.data, 16);
+      telemetry.power = this.bytesToFloat(frame.data, 20);
+      telemetry.temperature = this.bytesToFloat(frame.data, 24);
+
+      if (frame.data.length >= 104) {
+        telemetry.capacityAh = this.bytesToFloat(frame.data, 96);
+        telemetry.energyWh = this.bytesToFloat(frame.data, 100);
+      }
+
+      if (frame.data.length > 109) {
+        telemetry.outputOn = frame.data[107] === 1;
+        telemetry.mode = frame.data[108] === 1 ? 'CC' : 'CV';
+        const p = frame.data[109];
+        telemetry.protection = {
+          code: p,
+          ovp: p === ProtectionCode.OVP,
+          ocp: p === ProtectionCode.OCP,
+          opp: p === ProtectionCode.OPP,
+          otp: p === ProtectionCode.OTP,
+          scp: p === ProtectionCode.SCP
+        };
+      }
     }
 
     return telemetry;
@@ -189,5 +242,5 @@ class IPS3608Protocol {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CmdType, Register, IPS3608Protocol };
+  module.exports = { CmdType, Register, ProtectionCode, IPS3608Protocol };
 }
