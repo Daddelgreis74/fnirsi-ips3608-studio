@@ -41,11 +41,35 @@ const state = {
 
   // Scope Waveform History
   history: [],
-  timebaseSeconds: 30
+  timebaseSeconds: 30,
+
+  // Hardware Protection Limits (Registers 0xD1 - 0xD5)
+  protectionLimits: {
+    ovp: 38.00,
+    ocp: 8.20,
+    opp: 300.0,
+    otp: 80.0,
+    lvp: 0.00
+  },
+
+  // Device Hardware Info
+  deviceInfo: {
+    model: 'IPS3608',
+    firmware: '',
+    serial: ''
+  }
 };
 
 // UI Element References
 const elements = {
+  // Device Info Chip
+  deviceInfoChip: document.getElementById('deviceInfoChip'),
+  chipModelText: document.getElementById('chipModelText'),
+  chipFwText: document.getElementById('chipFwText'),
+  chipSnText: document.getElementById('chipSnText'),
+  btnOpenProtectionModal: document.getElementById('btnOpenProtectionModal'),
+  btnBootloader: document.getElementById('btnBootloader'),
+
   btnConnect: document.getElementById('btnConnect'),
   btnConnectText: document.getElementById('btnConnectText'),
   comPortSelect: document.getElementById('comPortSelect'),
@@ -69,6 +93,7 @@ const elements = {
   dispCapacityAh: document.getElementById('dispCapacityAh'),
   dispEnergyWh: document.getElementById('dispEnergyWh'),
   dispUptime: document.getElementById('dispUptime'),
+  btnResetCapacity: document.getElementById('btnResetCapacity'),
 
   // Protection Indicators (Pills)
   flagOvp: document.getElementById('flagOvp'),
@@ -76,6 +101,18 @@ const elements = {
   flagOpp: document.getElementById('flagOpp'),
   flagOtp: document.getElementById('flagOtp'),
   flagScp: document.getElementById('flagScp'),
+
+  // Hardware Protection Modal
+  modalProtectionSettings: document.getElementById('modalProtectionSettings'),
+  btnCloseProtectionModal: document.getElementById('btnCloseProtectionModal'),
+  btnRefreshProtectionLimits: document.getElementById('btnRefreshProtectionLimits'),
+  btnSaveProtectionLimits: document.getElementById('btnSaveProtectionLimits'),
+  protectionSaveFeedback: document.getElementById('protectionSaveFeedback'),
+  inputLimitOvp: document.getElementById('inputLimitOvp'),
+  inputLimitOcp: document.getElementById('inputLimitOcp'),
+  inputLimitOpp: document.getElementById('inputLimitOpp'),
+  inputLimitOtp: document.getElementById('inputLimitOtp'),
+  inputLimitLvp: document.getElementById('inputLimitLvp'),
   
   inputTargetVoltage: document.getElementById('inputTargetVoltage'),
   sliderVoltage: document.getElementById('sliderVoltage'),
@@ -153,6 +190,14 @@ async function connectSerial() {
     // Send handshake
     await sendFrame(IPS3608Protocol.connectPacket());
 
+    // Query hardware metadata (Model, Firmware version, Serial Number)
+    await sendFrame(IPS3608Protocol.queryModel());
+    await sendFrame(IPS3608Protocol.queryFirmware());
+    await sendFrame(IPS3608Protocol.querySerial());
+
+    // Ensure capacity accumulator is active on device
+    await sendFrame(IPS3608Protocol.startCapacity());
+
     // Start reading loop
     readLoop();
 
@@ -199,7 +244,8 @@ async function disconnectSerial() {
   }
 
   updateConnectionUI(false);
-  state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false };
+  state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false, lvp: false };
+  state.deviceInfo = { model: 'IPS3608', firmware: '', serial: '' };
   updateTelemetryDisplays();
 }
 
@@ -282,6 +328,11 @@ function startPolling() {
 
 function startSimulation() {
   state.connected = true;
+  state.deviceInfo = {
+    model: 'IPS3608',
+    firmware: 'V1.9_DEMO',
+    serial: 'SN-DEMO-260429'
+  };
   updateConnectionUI(true, 'Demo-Modus aktiv');
 
   if (state.simTimer) clearInterval(state.simTimer);
@@ -326,8 +377,21 @@ function applyTelemetry(data) {
   if (data.temperature !== undefined) state.temperature = data.temperature;
   if (data.outputOn !== undefined) updateOutputState(data.outputOn);
   if (data.mode !== undefined) state.mode = data.mode;
-  if (data.capacityAh !== undefined && data.capacityAh > 0) state.capacityAh = data.capacityAh;
-  if (data.energyWh !== undefined && data.energyWh > 0) state.energyWh = data.energyWh;
+  if (data.capacityAh !== undefined) state.capacityAh = data.capacityAh;
+  if (data.energyWh !== undefined) state.energyWh = data.energyWh;
+
+  // Device Info
+  if (data.model !== undefined && data.model.length > 0) state.deviceInfo.model = data.model;
+  if (data.firmware !== undefined && data.firmware.length > 0) state.deviceInfo.firmware = data.firmware;
+  if (data.serial !== undefined && data.serial.length > 0) state.deviceInfo.serial = data.serial;
+
+  // Hardware Protection Limits
+  if (data.ovpLimit !== undefined && data.ovpLimit > 0) state.protectionLimits.ovp = data.ovpLimit;
+  if (data.ocpLimit !== undefined && data.ocpLimit > 0) state.protectionLimits.ocp = data.ocpLimit;
+  if (data.oppLimit !== undefined && data.oppLimit > 0) state.protectionLimits.opp = data.oppLimit;
+  if (data.otpLimit !== undefined && data.otpLimit > 0) state.protectionLimits.otp = data.otpLimit;
+  if (data.lvpLimit !== undefined) state.protectionLimits.lvp = data.lvpLimit;
+
   if (data.protection !== undefined) {
     state.protection = data.protection;
   }
@@ -362,13 +426,24 @@ function updateTelemetryDisplays() {
     elements.dispUptime.textContent = `${h}:${m}:${s}`;
   }
 
-  // Protection Pills (OVP, OCP, OPP, OTP, KURZSCHLUSS)
+  // Device Info Chip
+  if (elements.chipModelText && state.deviceInfo.model) {
+    elements.chipModelText.textContent = state.deviceInfo.model;
+  }
+  if (elements.chipFwText) {
+    elements.chipFwText.textContent = state.deviceInfo.firmware ? (`FW: ${state.deviceInfo.firmware}`) : 'FW: --';
+  }
+  if (elements.chipSnText) {
+    elements.chipSnText.textContent = state.deviceInfo.serial ? (`SN: ${state.deviceInfo.serial}`) : 'SN: --';
+  }
+
+  // Protection Pills (OVP, OCP, OPP, OTP, LVP / SCP)
   const prot = state.protection || {};
   if (elements.flagOvp) elements.flagOvp.classList.toggle('flag-alert', !!prot.ovp);
   if (elements.flagOcp) elements.flagOcp.classList.toggle('flag-alert', !!prot.ocp);
   if (elements.flagOpp) elements.flagOpp.classList.toggle('flag-alert', !!prot.opp);
   if (elements.flagOtp) elements.flagOtp.classList.toggle('flag-alert', !!prot.otp);
-  if (elements.flagScp) elements.flagScp.classList.toggle('flag-alert', !!prot.scp);
+  if (elements.flagScp) elements.flagScp.classList.toggle('flag-alert', !!(prot.scp || prot.lvp));
 }
 
 function updateConnectionUI(connected, labelOverride) {
@@ -437,6 +512,114 @@ function toggleMasterOutput() {
 
   if (state.connected && !state.simMode) {
     sendFrame(IPS3608Protocol.setOutput(newState));
+  }
+}
+
+// ==========================================================================
+// Advanced Hardware Commands (Capacity Reset, Bootloader & Safety Limits)
+// ==========================================================================
+
+async function resetCapacityCounter() {
+  state.capacityAh = 0.00;
+  state.energyWh = 0.00;
+  updateTelemetryDisplays();
+
+  if (state.connected && !state.simMode) {
+    // CMD_11: F1 B1 D8 01 00 D9 (Zero capacity accumulator)
+    await sendFrame(IPS3608Protocol.resetCapacity());
+    setTimeout(async () => {
+      // Re-enable accumulator (CMD_10)
+      await sendFrame(IPS3608Protocol.startCapacity());
+    }, 150);
+  }
+}
+
+async function triggerBootloader() {
+  const confirmed = confirm(
+    'Möchten Sie das Netzteil wirklich in den Firmware-Bootloader-Modus (IAP) versetzen?\n\n' +
+    'Das Gerät startet im IAP-Modus neu, um Firmware über das FNIRSI-Tool oder USB zu flashen.\n' +
+    'Die serielle Verbindung wird dabei getrennt.'
+  );
+  if (!confirmed) return;
+
+  if (state.connected && !state.simMode) {
+    await sendFrame(IPS3608Protocol.enterBootloader());
+    setTimeout(() => {
+      disconnectSerial();
+    }, 300);
+  } else if (state.simMode) {
+    alert('Simulation: Bootloader-Befehl (CMD_15: F1 C0 00 01 01 02) gesendet.');
+    disconnectSerial();
+  }
+}
+
+function updateProtectionModalInputs() {
+  if (elements.inputLimitOvp) elements.inputLimitOvp.value = state.protectionLimits.ovp.toFixed(2);
+  if (elements.inputLimitOcp) elements.inputLimitOcp.value = state.protectionLimits.ocp.toFixed(2);
+  if (elements.inputLimitOpp) elements.inputLimitOpp.value = state.protectionLimits.opp.toFixed(1);
+  if (elements.inputLimitOtp) elements.inputLimitOtp.value = state.protectionLimits.otp.toFixed(1);
+  if (elements.inputLimitLvp) elements.inputLimitLvp.value = state.protectionLimits.lvp.toFixed(2);
+}
+
+function openProtectionModal() {
+  updateProtectionModalInputs();
+  if (elements.protectionSaveFeedback) {
+    elements.protectionSaveFeedback.className = 'save-feedback hidden';
+    elements.protectionSaveFeedback.textContent = '';
+  }
+  elements.modalProtectionSettings.classList.remove('hidden');
+
+  if (state.connected && !state.simMode) {
+    sendFrame(IPS3608Protocol.queryAll());
+  }
+}
+
+function closeProtectionModal() {
+  elements.modalProtectionSettings.classList.add('hidden');
+}
+
+async function refreshProtectionLimits() {
+  if (state.connected && !state.simMode) {
+    await sendFrame(IPS3608Protocol.queryAll());
+  }
+  updateProtectionModalInputs();
+  if (elements.protectionSaveFeedback) {
+    elements.protectionSaveFeedback.className = 'save-feedback success';
+    elements.protectionSaveFeedback.textContent = '✓ Schwellenwerte aus dem Gerät aktualisiert!';
+    setTimeout(() => {
+      if (elements.protectionSaveFeedback) elements.protectionSaveFeedback.className = 'save-feedback hidden';
+    }, 2500);
+  }
+}
+
+async function saveProtectionLimits() {
+  const ovp = Math.max(0, Math.min(38.0, parseFloat(elements.inputLimitOvp.value) || 38.0));
+  const ocp = Math.max(0, Math.min(8.5, parseFloat(elements.inputLimitOcp.value) || 8.2));
+  const opp = Math.max(0, Math.min(320.0, parseFloat(elements.inputLimitOpp.value) || 300.0));
+  const otp = Math.max(30.0, Math.min(95.0, parseFloat(elements.inputLimitOtp.value) || 80.0));
+  const lvp = Math.max(0, Math.min(36.0, parseFloat(elements.inputLimitLvp.value) || 0.0));
+
+  state.protectionLimits = { ovp, ocp, opp, otp, lvp };
+
+  if (state.connected && !state.simMode) {
+    // Send frames with small pause to ensure device EEPROM write cycle
+    await sendFrame(IPS3608Protocol.setOvpLimit(ovp));
+    await new Promise(r => setTimeout(r, 40));
+    await sendFrame(IPS3608Protocol.setOcpLimit(ocp));
+    await new Promise(r => setTimeout(r, 40));
+    await sendFrame(IPS3608Protocol.setOppLimit(opp));
+    await new Promise(r => setTimeout(r, 40));
+    await sendFrame(IPS3608Protocol.setOtpLimit(otp));
+    await new Promise(r => setTimeout(r, 40));
+    await sendFrame(IPS3608Protocol.setLvpLimit(lvp));
+  }
+
+  if (elements.protectionSaveFeedback) {
+    elements.protectionSaveFeedback.className = 'save-feedback success';
+    elements.protectionSaveFeedback.textContent = '✓ Schutzgrenzen erfolgreich im Gerät gespeichert!';
+    setTimeout(() => {
+      if (elements.protectionSaveFeedback) elements.protectionSaveFeedback.className = 'save-feedback hidden';
+    }, 3000);
   }
 }
 
@@ -626,6 +809,36 @@ function initEvents() {
 
   elements.btnExportCsv.addEventListener('click', exportCsv);
 
+  // Advanced Hardware Actions
+  if (elements.btnResetCapacity) {
+    elements.btnResetCapacity.addEventListener('click', resetCapacityCounter);
+  }
+
+  if (elements.btnBootloader) {
+    elements.btnBootloader.addEventListener('click', triggerBootloader);
+  }
+
+  // Protection Modal Actions
+  if (elements.btnOpenProtectionModal) {
+    elements.btnOpenProtectionModal.addEventListener('click', openProtectionModal);
+  }
+  if (elements.btnCloseProtectionModal) {
+    elements.btnCloseProtectionModal.addEventListener('click', closeProtectionModal);
+  }
+  if (elements.btnRefreshProtectionLimits) {
+    elements.btnRefreshProtectionLimits.addEventListener('click', refreshProtectionLimits);
+  }
+  if (elements.btnSaveProtectionLimits) {
+    elements.btnSaveProtectionLimits.addEventListener('click', saveProtectionLimits);
+  }
+  if (elements.modalProtectionSettings) {
+    elements.modalProtectionSettings.addEventListener('click', (e) => {
+      if (e.target === elements.modalProtectionSettings) {
+        closeProtectionModal();
+      }
+    });
+  }
+
   // Interactive Protection Flags (Demo/Simulation mode: click to toggle any protection alert)
   [
     { el: elements.flagOvp, key: 'ovp', code: 1 },
@@ -641,9 +854,15 @@ function initEvents() {
         if (state.simMode) {
           const active = !state.protection[key];
           state.protection[key] = active;
+          if (key === 'scp') state.protection.lvp = active;
           state.protection.code = active ? code : 0;
           if (active) {
             updateOutputState(false);
+            if (key === 'scp') {
+              state.actualVoltage = 0.00;
+              state.actualCurrent = 0.00;
+              state.actualPower = 0.00;
+            }
           }
           updateTelemetryDisplays();
         }

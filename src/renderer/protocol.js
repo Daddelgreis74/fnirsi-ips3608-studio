@@ -16,12 +16,26 @@ const Register = {
   SET_CURRENT: 0xC2,
   LIVE_VALUES: 0xC3,
   TEMPERATURE: 0xC4,
+  PRESET_1_V: 0xC5,
+  PRESET_1_A: 0xC6,
+  OVP_LIMIT: 0xD1,
+  OCP_LIMIT: 0xD2,
+  OPP_LIMIT: 0xD3,
+  OTP_LIMIT: 0xD4,
+  LVP_LIMIT: 0xD5,
+  BRIGHTNESS: 0xD6,
+  METERING: 0xD8,
+  CAPACITY_AH: 0xD9,
+  CAPACITY_WH: 0xDA,
   OUTPUT_STATE: 0xDB,
   PROTECTION: 0xDC,
   MODE: 0xDD,
-  BRIGHTNESS: 0xD6,
-  CAPACITY_AH: 0xD9,
-  CAPACITY_WH: 0xDA,
+  MODEL: 0xDE,
+  SERIAL: 0xDF,
+  FIRMWARE: 0xE0,
+  DEVICE_ID: 0xE1,
+  MAX_VOLTAGE: 0xE2,
+  MAX_CURRENT: 0xE3,
   ALL: 0xFF
 };
 
@@ -31,7 +45,8 @@ const ProtectionCode = {
   OCP: 2, // Over Current Protection
   OPP: 3, // Over Power Protection
   OTP: 4, // Over Temperature Protection
-  SCP: 5  // Short Circuit Protection (Kurzschluss)
+  LVP: 5, // Low Voltage Protection (欠压保护 - tripped on short-circuit voltage collapse)
+  SCP: 5  // Short Circuit Protection alias
 };
 
 class IPS3608Protocol {
@@ -139,6 +154,83 @@ class IPS3608Protocol {
   }
 
   /**
+   * Command: Set OVP Threshold Limit (Float32, Register 0xD1)
+   */
+  static setOvpLimit(voltage) {
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.OVP_LIMIT, this.floatToBytes(voltage));
+  }
+
+  /**
+   * Command: Set OCP Threshold Limit (Float32, Register 0xD2)
+   */
+  static setOcpLimit(current) {
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.OCP_LIMIT, this.floatToBytes(current));
+  }
+
+  /**
+   * Command: Set OPP Threshold Limit (Float32, Register 0xD3)
+   */
+  static setOppLimit(power) {
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.OPP_LIMIT, this.floatToBytes(power));
+  }
+
+  /**
+   * Command: Set OTP Threshold Limit (Float32, Register 0xD4)
+   */
+  static setOtpLimit(temperature) {
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.OTP_LIMIT, this.floatToBytes(temperature));
+  }
+
+  /**
+   * Command: Set LVP Threshold Limit (Float32, Register 0xD5)
+   */
+  static setLvpLimit(voltage) {
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.LVP_LIMIT, this.floatToBytes(voltage));
+  }
+
+  /**
+   * Command: Reset / Clear Hardware Ah & Wh Capacity Accumulator (Register 0xD8 = 0x00, CMD_11)
+   */
+  static resetCapacity() {
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.METERING, new Uint8Array([0x00]));
+  }
+
+  /**
+   * Command: Start Hardware Capacity Accumulator (Register 0xD8 = 0x01, CMD_10)
+   */
+  static startCapacity() {
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.METERING, new Uint8Array([0x01]));
+  }
+
+  /**
+   * Command: Trigger Bootloader Mode for Firmware Upgrade (CMD_15: F1 C0 00 01 01 02)
+   */
+  static enterBootloader() {
+    return this.buildFrame(CmdType.CONFIG, 0x00, new Uint8Array([0x01]));
+  }
+
+  /**
+   * Command: Query Device Firmware Version String (Register 0xE0, CMD_6)
+   */
+  static queryFirmware() {
+    return this.buildFrame(CmdType.READ, Register.FIRMWARE, new Uint8Array([0x00]));
+  }
+
+  /**
+   * Command: Query Device Serial Number String (Register 0xDF, CMD_16)
+   */
+  static querySerial() {
+    return this.buildFrame(CmdType.READ, Register.SERIAL, new Uint8Array([0x00]));
+  }
+
+  /**
+   * Command: Query Device Model Name (Register 0xDE, CMD_4)
+   */
+  static queryModel() {
+    return this.buildFrame(CmdType.READ, Register.MODEL, new Uint8Array([0x00]));
+  }
+
+  /**
    * Parses an incoming response buffer (looks for 0xF0 sync byte)
    */
   static parseStream(buffer) {
@@ -197,15 +289,33 @@ class IPS3608Protocol {
       telemetry.outputOn = frame.data[0] === 1;
     } else if (frame.register === Register.MODE && frame.data.length >= 1) {
       telemetry.mode = frame.data[0] === 1 ? 'CV' : 'CC';
+    } else if (frame.register === Register.MODEL && frame.data.length >= 1) {
+      telemetry.model = String.fromCharCode.apply(null, frame.data).replace(/\0/g, '').trim();
+    } else if (frame.register === Register.FIRMWARE && frame.data.length >= 1) {
+      telemetry.firmware = String.fromCharCode.apply(null, frame.data).replace(/\0/g, '').trim();
+    } else if (frame.register === Register.SERIAL && frame.data.length >= 1) {
+      telemetry.serial = String.fromCharCode.apply(null, frame.data).replace(/\0/g, '').trim();
+    } else if (frame.register === Register.OVP_LIMIT && frame.data.length >= 4) {
+      telemetry.ovpLimit = this.bytesToFloat(frame.data, 0);
+    } else if (frame.register === Register.OCP_LIMIT && frame.data.length >= 4) {
+      telemetry.ocpLimit = this.bytesToFloat(frame.data, 0);
+    } else if (frame.register === Register.OPP_LIMIT && frame.data.length >= 4) {
+      telemetry.oppLimit = this.bytesToFloat(frame.data, 0);
+    } else if (frame.register === Register.OTP_LIMIT && frame.data.length >= 4) {
+      telemetry.otpLimit = this.bytesToFloat(frame.data, 0);
+    } else if (frame.register === Register.LVP_LIMIT && frame.data.length >= 4) {
+      telemetry.lvpLimit = this.bytesToFloat(frame.data, 0);
     } else if (frame.register === Register.PROTECTION && frame.data.length >= 1) {
       const p = frame.data[0];
+      const isLvpScp = p === ProtectionCode.LVP || p === 5 || (p & 0x10) !== 0;
       telemetry.protection = {
         code: p,
         ovp: p === ProtectionCode.OVP || ((p & 0x01) !== 0 && p !== 5 && p !== 3),
         ocp: p === ProtectionCode.OCP || (p & 0x02) !== 0,
         opp: p === ProtectionCode.OPP || (p & 0x04) !== 0,
         otp: p === ProtectionCode.OTP || (p & 0x08) !== 0,
-        scp: p === ProtectionCode.SCP || p === 5 || (p & 0x10) !== 0
+        lvp: isLvpScp,
+        scp: isLvpScp
       };
     } else if (frame.register === Register.ALL && frame.data.length >= 28) {
       // Register 0xFF full status frame
@@ -217,6 +327,15 @@ class IPS3608Protocol {
       telemetry.power = this.bytesToFloat(frame.data, 20);
       telemetry.temperature = this.bytesToFloat(frame.data, 24);
 
+      // Hardware protection limits if populated in frame (offsets 76..95)
+      if (frame.data.length >= 96) {
+        telemetry.oppLimit = this.bytesToFloat(frame.data, 76);
+        telemetry.ovpLimit = this.bytesToFloat(frame.data, 80);
+        telemetry.ocpLimit = this.bytesToFloat(frame.data, 84);
+        telemetry.otpLimit = this.bytesToFloat(frame.data, 88);
+        telemetry.lvpLimit = this.bytesToFloat(frame.data, 92);
+      }
+
       if (frame.data.length >= 107) {
         telemetry.capacityAh = this.bytesToFloat(frame.data, 99);
         telemetry.energyWh = this.bytesToFloat(frame.data, 103);
@@ -224,16 +343,32 @@ class IPS3608Protocol {
 
       if (frame.data.length >= 110) {
         telemetry.outputOn = frame.data[107] === 1;
-        const p = frame.data[108]; // Offset 108: Protection status (0=OK, 1=OVP, 2=OCP, 3=OPP, 4=OTP, 5=SCP)
+        const p = frame.data[108]; // Offset 108: Protection status (0=OK, 1=OVP, 2=OCP, 3=OPP, 4=OTP, 5=LVP/SCP)
         telemetry.mode = frame.data[109] === 1 ? 'CV' : 'CC'; // Offset 109: Mode (1=CV, 0=CC)
+        const isLvpScp = p === ProtectionCode.LVP || p === 5 || (p & 0x10) !== 0;
         telemetry.protection = {
           code: p,
           ovp: p === ProtectionCode.OVP || ((p & 0x01) !== 0 && p !== 5 && p !== 3),
           ocp: p === ProtectionCode.OCP || (p & 0x02) !== 0,
           opp: p === ProtectionCode.OPP || (p & 0x04) !== 0,
           otp: p === ProtectionCode.OTP || (p & 0x08) !== 0,
-          scp: p === ProtectionCode.SCP || p === 5 || (p & 0x10) !== 0
+          lvp: isLvpScp,
+          scp: isLvpScp
         };
+      }
+
+      if (frame.data.length >= 119) {
+        telemetry.maxVoltage = this.bytesToFloat(frame.data, 111);
+        telemetry.maxCurrent = this.bytesToFloat(frame.data, 115);
+      }
+
+      // Secondary threshold slots (offsets 119..138)
+      if (frame.data.length >= 139) {
+        telemetry.ovpLimit = this.bytesToFloat(frame.data, 119);
+        telemetry.ocpLimit = this.bytesToFloat(frame.data, 123);
+        telemetry.otpLimit = this.bytesToFloat(frame.data, 127);
+        telemetry.lvpLimit = this.bytesToFloat(frame.data, 131);
+        telemetry.oppLimit = this.bytesToFloat(frame.data, 135);
       }
     }
 

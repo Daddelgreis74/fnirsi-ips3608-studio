@@ -1,7 +1,7 @@
 {
   "name": "fnirsi-ips3608-studio",
   "productName": "FNIRSI IPS3608 Studio",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Professional Windows Desktop Studio & Control Suite for the FNIRSI IPS3608 Programmable DC Power Supply",
   "main": "src/main.js",
   "author": "Daddelgreis74",

@@ -23,7 +23,15 @@
       </div>
       <div class="brand-text">
         <h1>FNIRSI IPS3608 <span>STUDIO</span></h1>
-        <span class="version-tag">PRO CONTROL v1.2.1</span>
+        <span class="version-tag">PRO CONTROL v1.3.0</span>
+      </div>
+      <div id="deviceInfoChip" class="device-info-chip" title="Hardware-Informationen (Modell, Firmware, Seriennummer)">
+        <span class="chip-dot"></span>
+        <span id="chipModelText" class="chip-model">IPS3608</span>
+        <span class="chip-sep">|</span>
+        <span id="chipFwText" class="chip-fw">FW: --</span>
+        <span class="chip-sep">|</span>
+        <span id="chipSnText" class="chip-sn">SN: --</span>
       </div>
     </div>
 
@@ -51,6 +59,14 @@
         </select>
         <button id="btnRefreshPorts" class="icon-btn" title="COM-Ports neu scannen">🔄</button>
       </div>
+
+      <button id="btnOpenProtectionModal" class="btn btn-tool" title="Hardware-Schutzgrenzen im EEPROM einstellen (OVP, OCP, OPP, OTP, LVP)">
+        <span>⚙️ Schutzgrenzen</span>
+      </button>
+
+      <button id="btnBootloader" class="btn btn-tool btn-tool-danger" title="IPS3608 in Firmware-Bootloader versetzen (CMD_15)">
+        <span>⚡ Bootloader</span>
+      </button>
 
       <button id="btnConnect" class="btn btn-connect">
         <span class="btn-icon">⚡</span>
@@ -113,7 +129,10 @@
       <!-- Secondary Telemetry / Capacity & Protection Flags -->
       <div class="telemetry-subgrid">
         <div class="sub-stat">
-          <span class="sub-label">KAPAZITÄT</span>
+          <div class="sub-header-row">
+            <span class="sub-label">KAPAZITÄT</span>
+            <button id="btnResetCapacity" class="btn-micro-reset" title="Hardware Ah/Wh Zähler im Gerät auf 0 zurücksetzen (CMD_11)">↺ Reset</button>
+          </div>
           <span id="dispCapacityAh" class="sub-val">0.000 Ah</span>
         </div>
         <div class="sub-stat">
@@ -128,11 +147,11 @@
 
       <!-- Protections Indicators -->
       <div class="protections-bar">
-        <span id="flagOvp" class="flag-pill">OVP</span>
-        <span id="flagOcp" class="flag-pill">OCP</span>
-        <span id="flagOpp" class="flag-pill">OPP</span>
-        <span id="flagOtp" class="flag-pill">OTP</span>
-        <span id="flagScp" class="flag-pill">KURZSCHLUSS</span>
+        <span id="flagOvp" class="flag-pill" title="Überspannungsschutz (Code 1 / OVP)">OVP</span>
+        <span id="flagOcp" class="flag-pill" title="Überstromsschutz (Code 2 / OCP)">OCP</span>
+        <span id="flagOpp" class="flag-pill" title="Überleistungsschutz (Code 3 / OPP)">OPP</span>
+        <span id="flagOtp" class="flag-pill" title="Übertemperaturschutz (Code 4 / OTP)">OTP</span>
+        <span id="flagScp" class="flag-pill" title="Unterspannung / Kurzschlussschutz (Code 5 / LVP / Kurzschluss)">LVP / SCP</span>
       </div>
     </section>
 
@@ -251,6 +270,87 @@
       </div>
     </section>
   </main>
+
+  <!-- Hardware Protection Limits Modal -->
+  <div id="modalProtectionSettings" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3>⚙️ HARDWARE-SCHUTZGRENZEN</h3>
+          <span class="modal-subtitle">Schwellenwerte direkt im EEPROM des IPS3608 programmieren (Registers 0xD1–0xD5)</span>
+        </div>
+        <button id="btnCloseProtectionModal" class="modal-close-btn" title="Schließen">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="protection-field">
+          <div class="field-label-group">
+            <label for="inputLimitOvp">OVP – Überspannungsschutz</label>
+            <span class="field-hint">Abschaltung bei Überschreiten dieser Ausgangsspannung</span>
+          </div>
+          <div class="field-input-group">
+            <input type="number" id="inputLimitOvp" min="0.0" max="38.0" step="0.1" value="38.00">
+            <span class="unit">V</span>
+          </div>
+        </div>
+
+        <div class="protection-field">
+          <div class="field-label-group">
+            <label for="inputLimitOcp">OCP – Überstromschutz</label>
+            <span class="field-hint">Abschaltung bei Überschreiten dieses Ausgangsstroms</span>
+          </div>
+          <div class="field-input-group">
+            <input type="number" id="inputLimitOcp" min="0.0" max="8.5" step="0.01" value="8.20">
+            <span class="unit">A</span>
+          </div>
+        </div>
+
+        <div class="protection-field">
+          <div class="field-label-group">
+            <label for="inputLimitOpp">OPP – Überleistungsschutz</label>
+            <span class="field-hint">Abschaltung bei Überschreiten dieser Gesamtleistung</span>
+          </div>
+          <div class="field-input-group">
+            <input type="number" id="inputLimitOpp" min="0.0" max="320.0" step="1.0" value="300.0">
+            <span class="unit">W</span>
+          </div>
+        </div>
+
+        <div class="protection-field">
+          <div class="field-label-group">
+            <label for="inputLimitOtp">OTP – Übertemperaturschutz</label>
+            <span class="field-hint">Abschaltung bei Kühlkörpertemperatur</span>
+          </div>
+          <div class="field-input-group">
+            <input type="number" id="inputLimitOtp" min="30.0" max="95.0" step="1.0" value="80.0">
+            <span class="unit">°C</span>
+          </div>
+        </div>
+
+        <div class="protection-field">
+          <div class="field-label-group">
+            <label for="inputLimitLvp">LVP – Unterspannungsschutz / Kurzschluss</label>
+            <span class="field-hint">Abschaltung bei Spannungseinbruch (0.00 V = inaktiv/Default)</span>
+          </div>
+          <div class="field-input-group">
+            <input type="number" id="inputLimitLvp" min="0.0" max="36.0" step="0.1" value="0.00">
+            <span class="unit">V</span>
+          </div>
+        </div>
+
+        <div id="protectionSaveFeedback" class="save-feedback hidden"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnRefreshProtectionLimits" class="btn btn-secondary" title="Schutzgrenzen aus dem Gerät abfragen">
+          <span>🔄 Neu auslesen</span>
+        </button>
+        <button id="btnSaveProtectionLimits" class="btn btn-primary" title="Werte in die Register des Netzteils flashen">
+          <span>💾 Im Gerät speichern</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script src="protocol.js"></script>
   <script src="app.js"></script>

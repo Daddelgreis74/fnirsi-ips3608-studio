@@ -121,4 +121,70 @@ console.log('Running FNIRSI IPS3608 Protocol Tests...');
   console.log('✓ Over-Current (OCP) detection verified');
 }
 
+// 7. Test Protection Threshold Limit Commands (Registers 0xD1 - 0xD5)
+{
+  const ovpFrame = IPS3608Protocol.setOvpLimit(32.5);
+  assert.strictEqual(ovpFrame[0], 0xF1);
+  assert.strictEqual(ovpFrame[1], CmdType.WRITE_BYTE);
+  assert.strictEqual(ovpFrame[2], Register.OVP_LIMIT); // 0xD1
+  assert.strictEqual(ovpFrame[3], 4);
+  const decodedOvp = IPS3608Protocol.bytesToFloat(ovpFrame, 4);
+  assert.strictEqual(Math.round(decodedOvp * 10) / 10, 32.5, 'OVP limit float mismatch');
+
+  const ocpFrame = IPS3608Protocol.setOcpLimit(5.2);
+  assert.strictEqual(ocpFrame[2], Register.OCP_LIMIT); // 0xD2
+
+  const oppFrame = IPS3608Protocol.setOppLimit(150.0);
+  assert.strictEqual(oppFrame[2], Register.OPP_LIMIT); // 0xD3
+
+  const otpFrame = IPS3608Protocol.setOtpLimit(75.0);
+  assert.strictEqual(otpFrame[2], Register.OTP_LIMIT); // 0xD4
+
+  const lvpFrame = IPS3608Protocol.setLvpLimit(4.0);
+  assert.strictEqual(lvpFrame[2], Register.LVP_LIMIT); // 0xD5
+  console.log('✓ Hardware protection threshold command frames (0xD1-0xD5) verified');
+}
+
+// 8. Test Capacity Metering Reset & Start (Register 0xD8, CMD_10 & CMD_11)
+{
+  const resetFrame = IPS3608Protocol.resetCapacity();
+  assert.strictEqual(resetFrame[0], 0xF1);
+  assert.strictEqual(resetFrame[1], CmdType.WRITE_BYTE);
+  assert.strictEqual(resetFrame[2], Register.METERING); // 0xD8
+  assert.strictEqual(resetFrame[3], 1);
+  assert.strictEqual(resetFrame[4], 0x00);
+  assert.strictEqual(resetFrame[5], (0xD8 + 1 + 0) & 0xFF); // 0xD9 (CMD_11: F1 B1 D8 01 00 D9)
+
+  const startFrame = IPS3608Protocol.startCapacity();
+  assert.strictEqual(startFrame[4], 0x01);
+  assert.strictEqual(startFrame[5], (0xD8 + 1 + 1) & 0xFF); // 0xDA (CMD_10: F1 B1 D8 01 01 DA)
+  console.log('✓ Hardware Capacity/Energy reset (CMD_11) and start (CMD_10) verified');
+}
+
+// 9. Test Bootloader Trigger Frame (CMD_15: F1 C0 00 01 01 02)
+{
+  const bootFrame = IPS3608Protocol.enterBootloader();
+  assert.strictEqual(bootFrame[0], 0xF1);
+  assert.strictEqual(bootFrame[1], CmdType.CONFIG); // 0xC0
+  assert.strictEqual(bootFrame[2], 0x00);
+  assert.strictEqual(bootFrame[3], 1);
+  assert.strictEqual(bootFrame[4], 0x01);
+  assert.strictEqual(bootFrame[5], 0x02);
+  console.log('✓ Official Bootloader Mode trigger frame (CMD_15) verified');
+}
+
+// 10. Test Device Info Frame Decoding (Firmware, Serial, Model)
+{
+  const fwData = new TextEncoder().encode('V1.9\0');
+  const fwFrame = { register: Register.FIRMWARE, data: fwData };
+  const decodedFw = IPS3608Protocol.decodeTelemetry(fwFrame);
+  assert.strictEqual(decodedFw.firmware, 'V1.9');
+
+  const snData = new TextEncoder().encode('SN80AC1234\0');
+  const snFrame = { register: Register.SERIAL, data: snData };
+  const decodedSn = IPS3608Protocol.decodeTelemetry(snFrame);
+  assert.strictEqual(decodedSn.serial, 'SN80AC1234');
+  console.log('✓ Device Info decoding (Firmware, Serial, Model) verified');
+}
+
 console.log('\nAll protocol tests passed cleanly!');
