@@ -365,34 +365,116 @@ body {
 .meter-current .bar-fill { background: var(--color-green); }
 .meter-power .bar-fill { background: var(--color-amber); }
 
-/* Sub Telemetry Grid */
-.telemetry-subgrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  background: rgba(10, 16, 28, 0.6);
-  padding: 8px 10px;
+/* ==========================================================================
+   Accumulator & Capacity Tracker Card
+   ========================================================================== */
+.accumulator-card {
+  background: rgba(10, 16, 28, 0.85);
+  border: 1px solid rgba(0, 215, 255, 0.18);
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.sub-stat {
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
-.sub-label {
-  font-size: 0.65rem;
-  letter-spacing: 1px;
-  color: var(--text-dim);
+.accumulator-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(18, 28, 48, 0.65);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.sub-val {
-  font-family: var(--font-mono);
+.acc-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.acc-icon {
   font-size: 0.85rem;
-  font-weight: 600;
+  color: var(--color-cyan);
+}
+
+.acc-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.btn-acc-reset {
+  background: rgba(255, 170, 0, 0.12);
+  border: 1px solid rgba(255, 170, 0, 0.35);
+  color: var(--color-amber);
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.btn-acc-reset:hover {
+  background: rgba(255, 170, 0, 0.25);
+  border-color: var(--color-amber);
+  box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-acc-reset:active {
+  transform: translateY(0);
+}
+
+.accumulator-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+}
+
+.acc-stat-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.acc-stat-box .acc-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.acc-stat-box .acc-val {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
   color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.acc-stat-full {
+  grid-column: span 2;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.acc-stat-full .acc-val-time {
+  font-size: 1.1rem;
+  color: var(--color-cyan);
 }
 
 /* Protection Flags */
@@ -863,32 +945,6 @@ input:checked + .slider.round:before { transform: translateX(14px); }
   color: #ff3366;
   background: rgba(255, 51, 102, 0.15);
   box-shadow: 0 0 10px rgba(255, 51, 102, 0.3);
-}
-
-/* Micro Capacity Reset */
-.sub-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.btn-micro-reset {
-  background: rgba(255, 170, 0, 0.12);
-  border: 1px solid rgba(255, 170, 0, 0.3);
-  color: var(--color-amber);
-  font-size: 0.62rem;
-  font-weight: 700;
-  border-radius: 3px;
-  padding: 1px 6px;
-  cursor: pointer;
-  line-height: 1.2;
-  transition: all 0.2s ease;
-}
-
-.btn-micro-reset:hover {
-  background: rgba(255, 170, 0, 0.25);
-  border-color: var(--color-amber);
-  box-shadow: 0 0 6px rgba(255, 170, 0, 0.4);
 }
 
 /* ==========================================================================

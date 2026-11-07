@@ -23,7 +23,7 @@
       </div>
       <div class="brand-text">
         <h1>FNIRSI IPS3608 <span>STUDIO</span></h1>
-        <span class="version-tag">PRO CONTROL v1.3.0</span>
+        <span class="version-tag">PRO CONTROL v1.3.1</span>
       </div>
       <div id="deviceInfoChip" class="device-info-chip" title="Hardware-Informationen (Modell, Firmware, Seriennummer)">
         <span class="chip-dot"></span>
@@ -126,22 +126,36 @@
         </div>
       </div>
 
-      <!-- Secondary Telemetry / Capacity & Protection Flags -->
-      <div class="telemetry-subgrid">
-        <div class="sub-stat">
-          <div class="sub-header-row">
-            <span class="sub-label">KAPAZITÄT</span>
-            <button id="btnResetCapacity" class="btn-micro-reset" title="Hardware Ah/Wh Zähler im Gerät auf 0 zurücksetzen (CMD_11)">↺ Reset</button>
+      <!-- Secondary Telemetry: Capacity, Energy & Session Timer -->
+      <div class="accumulator-card">
+        <div class="accumulator-header">
+          <div class="acc-title-group">
+            <span class="acc-icon">⚡</span>
+            <span class="acc-title">KAPAZITÄT & ENERGIE</span>
           </div>
-          <span id="dispCapacityAh" class="sub-val">0.000 Ah</span>
+          <button id="btnResetCapacity" class="btn-acc-reset" title="Hardware Ah/Wh Zähler im Gerät auf 0 zurücksetzen (CMD_11)">
+            <span class="reset-icon">↺</span> Zähler Reset
+          </button>
         </div>
-        <div class="sub-stat">
-          <span class="sub-label">ENERGIE</span>
-          <span id="dispEnergyWh" class="sub-val">0.000 Wh</span>
-        </div>
-        <div class="sub-stat">
-          <span class="sub-label">ZEIT</span>
-          <span id="dispUptime" class="sub-val">00:00:00</span>
+
+        <div class="accumulator-grid">
+          <!-- Capacity Ah -->
+          <div class="acc-stat-box">
+            <span class="acc-label">KAPAZITÄT</span>
+            <span id="dispCapacityAh" class="acc-val">0.000 Ah</span>
+          </div>
+
+          <!-- Energy Wh -->
+          <div class="acc-stat-box">
+            <span class="acc-label">ENERGIE</span>
+            <span id="dispEnergyWh" class="acc-val">0.000 Wh</span>
+          </div>
+
+          <!-- Active Output Runtime -->
+          <div class="acc-stat-box acc-stat-full">
+            <span class="acc-label">LAUFZEIT (OUTPUT AKTIV)</span>
+            <span id="dispUptime" class="acc-val acc-val-time">00:00:00</span>
+          </div>
         </div>
       </div>
 
