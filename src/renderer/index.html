@@ -23,7 +23,7 @@
       </div>
       <div class="brand-text">
         <h1>FNIRSI IPS3608 <span>STUDIO</span></h1>
-        <span class="version-tag">PRO CONTROL v1.0.1</span>
+        <span class="version-tag">PRO CONTROL v1.1.0</span>
       </div>
     </div>
 
@@ -59,10 +59,42 @@
     </div>
   </header>
 
+  <!-- Navigation View Bar & Display Mode Selector -->
+  <nav class="view-navbar">
+    <div class="view-tabs">
+      <button id="tabDcPower" class="view-tab-btn active" title="Hauptausgang (Labornetzteil 0–36V / 8.2A)">
+        <span class="tab-icon">⚡</span>
+        <span class="tab-text">Labornetzteil (DC)</span>
+      </button>
+      <button id="tabUsbMonitor" class="view-tab-btn" title="Front-USB Schnelllade-Monitor (USB-C & USB-A)">
+        <span class="tab-icon">🔌</span>
+        <span class="tab-text">Front-USB Schnelllade-Monitor</span>
+        <span id="usbActivityBadge" class="tab-activity-badge">STANDBY</span>
+      </button>
+      <button id="tabSplitView" class="view-tab-btn" title="Labornetzteil und USB-Monitor gleichzeitig nebeneinander">
+        <span class="tab-icon">🔀</span>
+        <span class="tab-text">Split-Ansicht</span>
+      </button>
+    </div>
+
+    <!-- Auto-Display Switch Option -->
+    <div class="view-settings">
+      <div id="autoSwitchNotification" class="auto-switch-notify" style="display: none;">
+        <span class="notify-dot"></span>
+        <span id="autoSwitchNotifyText">Auto-Switch aktiv</span>
+      </div>
+      <label class="auto-switch-toggle" title="Schaltet automatisch auf das USB-Display um, wenn ein USB-Ladevorgang erkannt wird, und zurück zum Labornetzteil, wenn der DC-Ausgang aktiv ist.">
+        <input type="checkbox" id="autoSwitchCheckbox" checked>
+        <span class="auto-switch-slider"></span>
+        <span class="auto-switch-label">Auto-Display Switch</span>
+      </label>
+    </div>
+  </nav>
+
   <!-- Main Studio Workspace -->
-  <main class="studio-grid">
+  <main class="studio-grid" id="mainStudioGrid">
     <!-- LEFT: Large Live Telemetry Instruments -->
-    <section class="panel telemetry-panel">
+    <section class="panel dc-panel telemetry-panel">
       <div class="panel-header">
         <h2>IST-WERTE (TELEMETRIE)</h2>
         <div class="badge-cluster">
@@ -137,7 +169,7 @@
     </section>
 
     <!-- CENTER: Master Power Switch & Setpoint Controls -->
-    <section class="panel control-panel">
+    <section class="panel dc-panel control-panel">
       <!-- Master Big Power Switch Button -->
       <div class="master-power-wrapper">
         <button id="btnMasterPower" class="master-power-btn btn-power-off">
@@ -213,7 +245,7 @@
     </section>
 
     <!-- RIGHT / BOTTOM: Live Waveform Oscilloscope & Session Data Logger -->
-    <section class="panel scope-panel">
+    <section class="panel dc-panel scope-panel">
       <div class="panel-header">
         <div class="scope-legend">
           <h2>ECHTZEIT-GRAPH (SCOPE)</h2>
@@ -247,6 +279,246 @@
         </div>
         <button id="btnExportCsv" class="btn btn-export" disabled>
           <span>📥 CSV Exportieren</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- FRONT-USB FAST CHARGE MONITOR PANELS (PORT 1 & 2 + USB SCOPE)        -->
+    <!-- =================================================================== -->
+
+    <!-- USB-C (PORT 1) FAST-CHARGING PANEL -->
+    <section class="panel usb-panel usb-c-panel" id="panelUsbC" style="display: none;">
+      <div class="panel-header">
+        <div class="port-title-wrapper">
+          <span class="port-badge-icon port-icon-c">TYPE-C</span>
+          <h2>PORT 1: USB-C FAST CHARGE</h2>
+        </div>
+        <div class="badge-cluster">
+          <span id="badgeUsbCProtocol" class="badge badge-usbc">PD 3.0 (PPS)</span>
+          <span id="badgeUsbCStatus" class="badge badge-standby">STANDBY</span>
+        </div>
+      </div>
+
+      <div class="meters-container">
+        <!-- Voltage -->
+        <div class="meter-card meter-voltage">
+          <div class="meter-meta">
+            <span class="meter-title">LADESPANNUNG</span>
+            <span class="meter-unit">VOLT</span>
+          </div>
+          <div class="meter-value" id="dispUsbCVoltage">05.000</div>
+          <div class="meter-bar">
+            <div id="barUsbCVoltage" class="bar-fill" style="width: 25%;"></div>
+          </div>
+        </div>
+
+        <!-- Current -->
+        <div class="meter-card meter-current">
+          <div class="meter-meta">
+            <span class="meter-title">LADESTROM</span>
+            <span class="meter-unit">AMPERE</span>
+          </div>
+          <div class="meter-value" id="dispUsbCCurrent">0.0000</div>
+          <div class="meter-bar">
+            <div id="barUsbCCurrent" class="bar-fill bar-fill-current" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Power -->
+        <div class="meter-card meter-power">
+          <div class="meter-meta">
+            <span class="meter-title">LADELEISTUNG</span>
+            <span class="meter-unit">WATT</span>
+          </div>
+          <div class="meter-value" id="dispUsbCPower">00.00</div>
+          <div class="meter-bar">
+            <div id="barUsbCPower" class="bar-fill bar-fill-power" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Specs & Live Battery Stats -->
+      <div class="sub-telemetry usb-sub-stats">
+        <div class="sub-box">
+          <span class="sub-label">KAPAZITÄT</span>
+          <span id="dispUsbCMah" class="sub-val">0 mAh</span>
+        </div>
+        <div class="sub-box">
+          <span class="sub-label">ENERGIE</span>
+          <span id="dispUsbCWh" class="sub-val">0.000 Wh</span>
+        </div>
+        <div class="sub-box">
+          <span class="sub-label">LADEDAUER</span>
+          <span id="dispUsbCUptime" class="sub-val">00:00:00</span>
+        </div>
+      </div>
+
+      <div class="usb-profile-card">
+        <div class="profile-header">
+          <span>POWER DELIVERY PROFILE</span>
+          <span class="profile-max">MAX 65W</span>
+        </div>
+        <div class="profile-chips">
+          <span class="profile-chip">5V / 3A</span>
+          <span class="profile-chip chip-active" id="chipUsbC9V">9V / 3A</span>
+          <span class="profile-chip">12V / 3A</span>
+          <span class="profile-chip">15V / 3A</span>
+          <span class="profile-chip" id="chipUsbC20V">20V / 3.25A</span>
+          <span class="profile-chip chip-pps">PPS 3.3–21V</span>
+        </div>
+      </div>
+
+      <!-- Demo Simulation Quick Action (Sim-Modus) -->
+      <div class="usb-demo-actions" id="demoUsbCControls">
+        <div class="demo-actions-label">🎮 DEMO SIMULATION (PORT 1)</div>
+        <div class="demo-buttons-row">
+          <button id="btnSimUsbCPhone" class="btn btn-sm btn-sim-action">
+            <span>📲 Smartphone (PD 9V / 2.2A)</span>
+          </button>
+          <button id="btnSimUsbCLaptop" class="btn btn-sm btn-sim-action">
+            <span>💻 Laptop (PD 20V / 3A)</span>
+          </button>
+          <button id="btnSimUsbCDisconnect" class="btn btn-sm btn-sim-disconnect">
+            <span>🔌 Abstecken</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- USB-A (PORT 2) FAST-CHARGING PANEL -->
+    <section class="panel usb-panel usb-a-panel" id="panelUsbA" style="display: none;">
+      <div class="panel-header">
+        <div class="port-title-wrapper">
+          <span class="port-badge-icon port-icon-a">TYPE-A</span>
+          <h2>PORT 2: USB-A QUICK CHARGE</h2>
+        </div>
+        <div class="badge-cluster">
+          <span id="badgeUsbAProtocol" class="badge badge-usba">QC 3.0</span>
+          <span id="badgeUsbAStatus" class="badge badge-standby">STANDBY</span>
+        </div>
+      </div>
+
+      <div class="meters-container">
+        <!-- Voltage -->
+        <div class="meter-card meter-voltage">
+          <div class="meter-meta">
+            <span class="meter-title">LADESPANNUNG</span>
+            <span class="meter-unit">VOLT</span>
+          </div>
+          <div class="meter-value" id="dispUsbAVoltage">05.000</div>
+          <div class="meter-bar">
+            <div id="barUsbAVoltage" class="bar-fill" style="width: 41%;"></div>
+          </div>
+        </div>
+
+        <!-- Current -->
+        <div class="meter-card meter-current">
+          <div class="meter-meta">
+            <span class="meter-title">LADESTROM</span>
+            <span class="meter-unit">AMPERE</span>
+          </div>
+          <div class="meter-value" id="dispUsbACurrent">0.0000</div>
+          <div class="meter-bar">
+            <div id="barUsbACurrent" class="bar-fill bar-fill-current" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Power -->
+        <div class="meter-card meter-power">
+          <div class="meter-meta">
+            <span class="meter-title">LADELEISTUNG</span>
+            <span class="meter-unit">WATT</span>
+          </div>
+          <div class="meter-value" id="dispUsbAPower">00.00</div>
+          <div class="meter-bar">
+            <div id="barUsbAPower" class="bar-fill bar-fill-power" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Specs & Live Battery Stats -->
+      <div class="sub-telemetry usb-sub-stats">
+        <div class="sub-box">
+          <span class="sub-label">KAPAZITÄT</span>
+          <span id="dispUsbAMah" class="sub-val">0 mAh</span>
+        </div>
+        <div class="sub-box">
+          <span class="sub-label">ENERGIE</span>
+          <span id="dispUsbAWh" class="sub-val">0.000 Wh</span>
+        </div>
+        <div class="sub-box">
+          <span class="sub-label">LADEDAUER</span>
+          <span id="dispUsbAUptime" class="sub-val">00:00:00</span>
+        </div>
+      </div>
+
+      <div class="usb-profile-card">
+        <div class="profile-header">
+          <span>QUICKCHARGE & FAST PROTOKOLLE</span>
+          <span class="profile-max">MAX 18W</span>
+        </div>
+        <div class="profile-chips">
+          <span class="profile-chip chip-active">QC 2.0 / 3.0</span>
+          <span class="profile-chip chip-active">Huawei FCP / SCP</span>
+          <span class="profile-chip chip-active">Samsung AFC</span>
+          <span class="profile-chip chip-active">Apple 2.4A</span>
+          <span class="profile-chip">BC 1.2 DCP</span>
+        </div>
+      </div>
+
+      <!-- Demo Simulation Quick Action (Sim-Modus) -->
+      <div class="usb-demo-actions" id="demoUsbAControls">
+        <div class="demo-actions-label">🎮 DEMO SIMULATION (PORT 2)</div>
+        <div class="demo-buttons-row">
+          <button id="btnSimUsbAPhone" class="btn btn-sm btn-sim-action">
+            <span>🎧 Zubehör (QC 5V / 1.5A)</span>
+          </button>
+          <button id="btnSimUsbAFast" class="btn btn-sm btn-sim-action">
+            <span>⚡ Fast Charge (9V / 1.8A)</span>
+          </button>
+          <button id="btnSimUsbADisconnect" class="btn btn-sm btn-sim-disconnect">
+            <span>🔌 Abstecken</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- USB DUAL-TRACE REALTIME CHARGING SCOPE -->
+    <section class="panel usb-panel usb-scope-panel" id="panelUsbScope" style="display: none;">
+      <div class="panel-header">
+        <div class="scope-legend">
+          <h2>USB-LADEKURVEN (ECHTZEIT)</h2>
+          <span class="legend-item legend-usbc"><span class="dot"></span> USB-C (W)</span>
+          <span class="legend-item legend-usba"><span class="dot"></span> USB-A (W)</span>
+          <span class="legend-item legend-usb-total"><span class="dot"></span> Gesamt (W)</span>
+        </div>
+        <div class="scope-controls">
+          <label>Zeitfenster:</label>
+          <select id="usbTimebaseSelect" class="timebase-select">
+            <option value="10">10 Sek</option>
+            <option value="30" selected>30 Sek</option>
+            <option value="60">60 Sek</option>
+            <option value="120">2 Min</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="usbScopeCanvas"></canvas>
+      </div>
+
+      <!-- USB Summary Stats Toolbar -->
+      <div class="logger-bar">
+        <div class="usb-summary-info">
+          <span class="summary-label">GESAMTLEISTUNG:</span>
+          <span id="dispUsbTotalPower" class="summary-val">00.00 W</span>
+          <span class="summary-sep">|</span>
+          <span class="summary-label">PEAK:</span>
+          <span id="dispUsbPeakPower" class="summary-val">00.00 W</span>
+        </div>
+        <button id="btnExportUsbCsv" class="btn btn-export" disabled>
+          <span>📥 USB-Ladedaten Export</span>
         </button>
       </div>
     </section>

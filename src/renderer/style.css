@@ -790,3 +790,349 @@ body {
 }
 input:checked + .slider.round { background-color: var(--color-cyan); }
 input:checked + .slider.round:before { transform: translateX(14px); }
+
+/* ==========================================================================
+   Display & View Switcher Bar
+   ========================================================================== */
+.view-navbar {
+  height: 44px;
+  background: rgba(12, 19, 34, 0.95);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 90;
+}
+
+.view-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-tab-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.view-tab-btn:hover {
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.3);
+  color: var(--text-main);
+}
+
+.view-tab-btn.active {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(0, 119, 182, 0.25) 100%);
+  border-color: var(--color-cyan);
+  color: var(--color-cyan);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+.tab-activity-badge {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.tab-activity-badge.active-charging {
+  background: rgba(0, 255, 136, 0.25) !important;
+  border-color: var(--color-green) !important;
+  color: var(--color-green) !important;
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  animation: pulse-border 1.5s infinite;
+}
+
+.view-settings {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.auto-switch-notify {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid var(--color-cyan);
+  color: var(--color-cyan);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  animation: fadeInOut 3s forwards;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-4px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+.auto-switch-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-switch-slider {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 16px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  transition: .3s;
+}
+
+.auto-switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 10px;
+  width: 10px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .3s;
+}
+
+.auto-switch-toggle input {
+  display: none;
+}
+
+.auto-switch-toggle input:checked + .auto-switch-slider {
+  background-color: var(--color-cyan);
+  box-shadow: 0 0 8px var(--color-cyan-glow);
+}
+
+.auto-switch-toggle input:checked + .auto-switch-slider:before {
+  transform: translateX(14px);
+}
+
+/* ==========================================================================
+   USB Fast-Charging Panels Styling
+   ========================================================================== */
+.port-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.port-badge-icon {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.port-icon-c {
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: var(--color-cyan);
+}
+
+.port-icon-a {
+  background: rgba(255, 170, 0, 0.15);
+  border: 1px solid rgba(255, 170, 0, 0.4);
+  color: var(--color-amber);
+}
+
+.badge-usbc {
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--color-cyan);
+}
+
+.badge-usba {
+  background: rgba(255, 170, 0, 0.12);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  color: var(--color-amber);
+}
+
+.badge-standby {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+}
+
+.badge-fast-active {
+  background: rgba(0, 255, 136, 0.2) !important;
+  border-color: var(--color-green) !important;
+  color: var(--color-green) !important;
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+  animation: pulse-border 1.5s infinite;
+}
+
+/* USB Profiles Card */
+.usb-profile-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.8px;
+}
+
+.profile-max {
+  color: var(--color-amber);
+}
+
+.profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.profile-chip {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+}
+
+.profile-chip.chip-active {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: rgba(0, 240, 255, 0.3);
+  color: var(--text-main);
+}
+
+.profile-chip.chip-highlight {
+  background: rgba(0, 255, 136, 0.25) !important;
+  border-color: var(--color-green) !important;
+  color: var(--color-green) !important;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+.profile-chip.chip-pps {
+  background: rgba(180, 0, 255, 0.15);
+  border-color: rgba(180, 0, 255, 0.35);
+  color: #d180ff;
+}
+
+/* USB Demo Controls */
+.usb-demo-actions {
+  margin-top: auto;
+  background: rgba(0, 240, 255, 0.03);
+  border: 1px dashed rgba(0, 240, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.demo-actions-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--color-cyan);
+}
+
+.demo-buttons-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.btn-sim-action {
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: var(--text-main);
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-sim-action:hover {
+  background: rgba(0, 240, 255, 0.25);
+  border-color: var(--color-cyan);
+}
+
+.btn-sim-disconnect {
+  background: rgba(255, 51, 102, 0.12);
+  border: 1px solid rgba(255, 51, 102, 0.25);
+  color: #ff809b;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-sim-disconnect:hover {
+  background: rgba(255, 51, 102, 0.25);
+  border-color: #ff3366;
+}
+
+/* USB Scope Legends */
+.legend-usbc .dot { background: var(--color-cyan); box-shadow: 0 0 6px var(--color-cyan); }
+.legend-usba .dot { background: var(--color-amber); box-shadow: 0 0 6px var(--color-amber); }
+.legend-usb-total .dot { background: var(--color-green); box-shadow: 0 0 6px var(--color-green); }
+
+.usb-summary-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.summary-label {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.summary-val {
+  color: var(--color-green);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.summary-sep {
+  color: var(--border-subtle);
+}
+
+/* Split-Mode Layout */
+.studio-grid.split-mode {
+  grid-template-columns: 320px 320px 320px 1fr !important;
+  overflow-x: auto;
+}

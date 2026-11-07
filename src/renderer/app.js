@@ -39,6 +39,38 @@ const state = {
     scp: false
   },
 
+  // View & Display Management
+  activeView: 'dc', // 'dc', 'usb', 'split'
+  autoSwitchEnabled: true,
+  lastAutoSwitchTime: 0,
+
+  // Front-USB Fast-Charging Ports State
+  usb: {
+    usbc: {
+      v: 5.000,
+      a: 0.0000,
+      w: 0.00,
+      mah: 0,
+      wh: 0,
+      protocol: 'PD 3.0 (PPS)',
+      active: false,
+      startTime: null
+    },
+    usba: {
+      v: 5.000,
+      a: 0.0000,
+      w: 0.00,
+      mah: 0,
+      wh: 0,
+      protocol: 'QC 3.0 / FCP',
+      active: false,
+      startTime: null
+    },
+    peakPower: 0.00,
+    history: [],
+    timebaseSeconds: 30
+  },
+
   // Scope Waveform History
   history: [],
   timebaseSeconds: 30
@@ -87,7 +119,64 @@ const elements = {
   btnToggleLog: document.getElementById('btnToggleLog'),
   btnRecordText: document.getElementById('btnRecordText'),
   logCounter: document.getElementById('logCounter'),
-  btnExportCsv: document.getElementById('btnExportCsv')
+  btnExportCsv: document.getElementById('btnExportCsv'),
+
+  // View Navigation & Display Controls
+  tabDcPower: document.getElementById('tabDcPower'),
+  tabUsbMonitor: document.getElementById('tabUsbMonitor'),
+  tabSplitView: document.getElementById('tabSplitView'),
+  usbActivityBadge: document.getElementById('usbActivityBadge'),
+  autoSwitchCheckbox: document.getElementById('autoSwitchCheckbox'),
+  autoSwitchNotification: document.getElementById('autoSwitchNotification'),
+  autoSwitchNotifyText: document.getElementById('autoSwitchNotifyText'),
+  mainStudioGrid: document.getElementById('mainStudioGrid'),
+
+  // DC & USB Panels
+  dcPanels: document.querySelectorAll('.dc-panel'),
+  panelUsbC: document.getElementById('panelUsbC'),
+  panelUsbA: document.getElementById('panelUsbA'),
+  panelUsbScope: document.getElementById('panelUsbScope'),
+
+  // USB-C Elements
+  badgeUsbCProtocol: document.getElementById('badgeUsbCProtocol'),
+  badgeUsbCStatus: document.getElementById('badgeUsbCStatus'),
+  dispUsbCVoltage: document.getElementById('dispUsbCVoltage'),
+  dispUsbCCurrent: document.getElementById('dispUsbCCurrent'),
+  dispUsbCPower: document.getElementById('dispUsbCPower'),
+  barUsbCVoltage: document.getElementById('barUsbCVoltage'),
+  barUsbCCurrent: document.getElementById('barUsbCCurrent'),
+  barUsbCPower: document.getElementById('barUsbCPower'),
+  dispUsbCMah: document.getElementById('dispUsbCMah'),
+  dispUsbCWh: document.getElementById('dispUsbCWh'),
+  dispUsbCUptime: document.getElementById('dispUsbCUptime'),
+  chipUsbC9V: document.getElementById('chipUsbC9V'),
+  chipUsbC20V: document.getElementById('chipUsbC20V'),
+  btnSimUsbCPhone: document.getElementById('btnSimUsbCPhone'),
+  btnSimUsbCLaptop: document.getElementById('btnSimUsbCLaptop'),
+  btnSimUsbCDisconnect: document.getElementById('btnSimUsbCDisconnect'),
+
+  // USB-A Elements
+  badgeUsbAProtocol: document.getElementById('badgeUsbAProtocol'),
+  badgeUsbAStatus: document.getElementById('badgeUsbAStatus'),
+  dispUsbAVoltage: document.getElementById('dispUsbAVoltage'),
+  dispUsbACurrent: document.getElementById('dispUsbACurrent'),
+  dispUsbAPower: document.getElementById('dispUsbAPower'),
+  barUsbAVoltage: document.getElementById('barUsbAVoltage'),
+  barUsbACurrent: document.getElementById('barUsbACurrent'),
+  barUsbAPower: document.getElementById('barUsbAPower'),
+  dispUsbAMah: document.getElementById('dispUsbAMah'),
+  dispUsbAWh: document.getElementById('dispUsbAWh'),
+  dispUsbAUptime: document.getElementById('dispUsbAUptime'),
+  btnSimUsbAPhone: document.getElementById('btnSimUsbAPhone'),
+  btnSimUsbAFast: document.getElementById('btnSimUsbAFast'),
+  btnSimUsbADisconnect: document.getElementById('btnSimUsbADisconnect'),
+
+  // USB Scope Elements
+  usbScopeCanvas: document.getElementById('usbScopeCanvas'),
+  usbTimebaseSelect: document.getElementById('usbTimebaseSelect'),
+  dispUsbTotalPower: document.getElementById('dispUsbTotalPower'),
+  dispUsbPeakPower: document.getElementById('dispUsbPeakPower'),
+  btnExportUsbCsv: document.getElementById('btnExportUsbCsv')
 };
 
 // ==========================================================================
@@ -313,8 +402,43 @@ function startSimulation() {
       state.mode = 'CV';
     }
 
+    // Simulate USB-C charging activity if active
+    if (state.usb.usbc.active) {
+      if (!state.usb.usbc.startTime) state.usb.usbc.startTime = Date.now();
+      const targetA = state.usb.usbc.targetA || 2.18;
+      const ripple = (Math.sin(step * 4) * 0.02) + ((Math.random() - 0.5) * 0.01);
+      const curA = Math.max(0.1, targetA + ripple);
+      state.usb.usbc.a = curA;
+      state.usb.usbc.w = state.usb.usbc.v * curA;
+      state.usb.usbc.mah += (curA * 1000) * (0.05 / 3600);
+      state.usb.usbc.wh += state.usb.usbc.w * (0.05 / 3600);
+    } else {
+      state.usb.usbc.a = 0.0;
+      state.usb.usbc.w = 0.0;
+      state.usb.usbc.startTime = null;
+    }
+
+    // Simulate USB-A charging activity if active
+    if (state.usb.usba.active) {
+      if (!state.usb.usba.startTime) state.usb.usba.startTime = Date.now();
+      const targetA = state.usb.usba.targetA || 1.45;
+      const ripple = (Math.sin(step * 3) * 0.015) + ((Math.random() - 0.5) * 0.008);
+      const curA = Math.max(0.1, targetA + ripple);
+      state.usb.usba.a = curA;
+      state.usb.usba.w = state.usb.usba.v * curA;
+      state.usb.usba.mah += (curA * 1000) * (0.05 / 3600);
+      state.usb.usba.wh += state.usb.usba.w * (0.05 / 3600);
+    } else {
+      state.usb.usba.a = 0.0;
+      state.usb.usba.w = 0.0;
+      state.usb.usba.startTime = null;
+    }
+
     updateTelemetryDisplays();
+    updateUsbDisplays();
     recordHistoryPoint();
+    recordUsbHistoryPoint();
+    evaluateAutoDisplaySwitch();
   }, 50); // 20 Hz
 }
 
@@ -335,8 +459,21 @@ function applyTelemetry(data) {
     state.protection = data.protection;
   }
 
+  // Handle USB Telemetry if reported by device
+  if (data.usb) {
+    if (data.usb.usbc) {
+      Object.assign(state.usb.usbc, data.usb.usbc);
+    }
+    if (data.usb.usba) {
+      Object.assign(state.usb.usba, data.usb.usba);
+    }
+  }
+
   updateTelemetryDisplays();
+  updateUsbDisplays();
   recordHistoryPoint();
+  recordUsbHistoryPoint();
+  evaluateAutoDisplaySwitch();
 }
 
 function updateTelemetryDisplays() {
@@ -372,6 +509,159 @@ function updateTelemetryDisplays() {
   if (elements.flagOpp) elements.flagOpp.classList.toggle('flag-alert', !!prot.opp);
   if (elements.flagOtp) elements.flagOtp.classList.toggle('flag-alert', !!prot.otp);
   if (elements.flagScp) elements.flagScp.classList.toggle('flag-alert', !!prot.scp);
+}
+
+function updateUsbDisplays() {
+  const usbc = state.usb.usbc;
+  const usba = state.usb.usba;
+
+  // 1. USB-C Displays
+  if (elements.dispUsbCVoltage) elements.dispUsbCVoltage.textContent = usbc.v.toFixed(3);
+  if (elements.dispUsbCCurrent) elements.dispUsbCCurrent.textContent = usbc.a.toFixed(4);
+  if (elements.dispUsbCPower) elements.dispUsbCPower.textContent = usbc.w.toFixed(2);
+
+  if (elements.barUsbCVoltage) elements.barUsbCVoltage.style.width = Math.min(100, (usbc.v / 20.0) * 100) + '%';
+  if (elements.barUsbCCurrent) elements.barUsbCCurrent.style.width = Math.min(100, (usbc.a / 3.25) * 100) + '%';
+  if (elements.barUsbCPower) elements.barUsbCPower.style.width = Math.min(100, (usbc.w / 65.0) * 100) + '%';
+
+  if (elements.badgeUsbCProtocol) elements.badgeUsbCProtocol.textContent = usbc.protocol;
+  if (elements.badgeUsbCStatus) {
+    if (usbc.active) {
+      elements.badgeUsbCStatus.className = 'badge badge-fast-active';
+      elements.badgeUsbCStatus.textContent = '⚡ FAST CHARGE AKTIV';
+    } else {
+      elements.badgeUsbCStatus.className = 'badge badge-standby';
+      elements.badgeUsbCStatus.textContent = 'STANDBY';
+    }
+  }
+
+  if (elements.dispUsbCMah) elements.dispUsbCMah.textContent = Math.round(usbc.mah) + ' mAh';
+  if (elements.dispUsbCWh) elements.dispUsbCWh.textContent = usbc.wh.toFixed(3) + ' Wh';
+
+  if (usbc.startTime) {
+    const elapsedSec = Math.floor((Date.now() - usbc.startTime) / 1000);
+    const h = String(Math.floor(elapsedSec / 3600)).padStart(2, '0');
+    const m = String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0');
+    const s = String(elapsedSec % 60).padStart(2, '0');
+    if (elements.dispUsbCUptime) elements.dispUsbCUptime.textContent = `${h}:${m}:${s}`;
+  }
+
+  // Highlight active PD profile chip
+  if (elements.chipUsbC9V && elements.chipUsbC20V) {
+    elements.chipUsbC9V.classList.toggle('chip-highlight', usbc.active && usbc.v >= 8 && usbc.v <= 11);
+    elements.chipUsbC20V.classList.toggle('chip-highlight', usbc.active && usbc.v >= 18);
+  }
+
+  // 2. USB-A Displays
+  if (elements.dispUsbAVoltage) elements.dispUsbAVoltage.textContent = usba.v.toFixed(3);
+  if (elements.dispUsbACurrent) elements.dispUsbACurrent.textContent = usba.a.toFixed(4);
+  if (elements.dispUsbAPower) elements.dispUsbAPower.textContent = usba.w.toFixed(2);
+
+  if (elements.barUsbAVoltage) elements.barUsbAVoltage.style.width = Math.min(100, (usba.v / 12.0) * 100) + '%';
+  if (elements.barUsbACurrent) elements.barUsbACurrent.style.width = Math.min(100, (usba.a / 2.5) * 100) + '%';
+  if (elements.barUsbAPower) elements.barUsbAPower.style.width = Math.min(100, (usba.w / 18.0) * 100) + '%';
+
+  if (elements.badgeUsbAProtocol) elements.badgeUsbAProtocol.textContent = usba.protocol;
+  if (elements.badgeUsbAStatus) {
+    if (usba.active) {
+      elements.badgeUsbAStatus.className = 'badge badge-fast-active';
+      elements.badgeUsbAStatus.textContent = '⚡ FAST CHARGE AKTIV';
+    } else {
+      elements.badgeUsbAStatus.className = 'badge badge-standby';
+      elements.badgeUsbAStatus.textContent = 'STANDBY';
+    }
+  }
+
+  if (elements.dispUsbAMah) elements.dispUsbAMah.textContent = Math.round(usba.mah) + ' mAh';
+  if (elements.dispUsbAWh) elements.dispUsbAWh.textContent = usba.wh.toFixed(3) + ' Wh';
+
+  if (usba.startTime) {
+    const elapsedSec = Math.floor((Date.now() - usba.startTime) / 1000);
+    const h = String(Math.floor(elapsedSec / 3600)).padStart(2, '0');
+    const m = String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0');
+    const s = String(elapsedSec % 60).padStart(2, '0');
+    if (elements.dispUsbAUptime) elements.dispUsbAUptime.textContent = `${h}:${m}:${s}`;
+  }
+
+  // 3. Combined & Tab Activity Badge
+  const totalW = usbc.w + usba.w;
+  if (totalW > state.usb.peakPower) state.usb.peakPower = totalW;
+  if (elements.dispUsbTotalPower) elements.dispUsbTotalPower.textContent = totalW.toFixed(2) + ' W';
+  if (elements.dispUsbPeakPower) elements.dispUsbPeakPower.textContent = state.usb.peakPower.toFixed(2) + ' W';
+
+  if (elements.usbActivityBadge) {
+    if (usbc.active || usba.active) {
+      elements.usbActivityBadge.className = 'tab-activity-badge active-charging';
+      elements.usbActivityBadge.textContent = '⚡ ' + totalW.toFixed(1) + ' W';
+    } else {
+      elements.usbActivityBadge.className = 'tab-activity-badge';
+      elements.usbActivityBadge.textContent = 'STANDBY';
+    }
+  }
+}
+
+let autoSwitchNotifyTimer = null;
+
+function switchView(viewName, isAuto = false) {
+  state.activeView = viewName;
+
+  // 1. Update Tabs Active State
+  if (elements.tabDcPower) elements.tabDcPower.classList.toggle('active', viewName === 'dc');
+  if (elements.tabUsbMonitor) elements.tabUsbMonitor.classList.toggle('active', viewName === 'usb');
+  if (elements.tabSplitView) elements.tabSplitView.classList.toggle('active', viewName === 'split');
+
+  // 2. Adjust Grid & Panel Visibility
+  if (elements.mainStudioGrid) {
+    elements.mainStudioGrid.classList.toggle('split-mode', viewName === 'split');
+  }
+
+  const showDc = (viewName === 'dc' || viewName === 'split');
+  const showUsb = (viewName === 'usb' || viewName === 'split');
+
+  document.querySelectorAll('.dc-panel').forEach(p => {
+    p.style.display = showDc ? 'flex' : 'none';
+  });
+
+  document.querySelectorAll('.usb-panel').forEach(p => {
+    p.style.display = showUsb ? 'flex' : 'none';
+  });
+
+  // 3. Auto-Switch Notification Toast
+  if (isAuto && elements.autoSwitchNotification && elements.autoSwitchNotifyText) {
+    if (viewName === 'usb') {
+      elements.autoSwitchNotifyText.textContent = '⚡ Auto-Switch: USB Schnellladung aktiv';
+    } else if (viewName === 'dc') {
+      elements.autoSwitchNotifyText.textContent = '⚡ Auto-Switch: Labornetzteil aktiv';
+    }
+    elements.autoSwitchNotification.style.display = 'flex';
+    if (autoSwitchNotifyTimer) clearTimeout(autoSwitchNotifyTimer);
+    autoSwitchNotifyTimer = setTimeout(() => {
+      elements.autoSwitchNotification.style.display = 'none';
+    }, 2800);
+  }
+
+  // 4. Force Canvas Resize so graphs re-fit instantly
+  setTimeout(() => {
+    resizeCanvas();
+    resizeUsbCanvas();
+  }, 50);
+}
+
+function evaluateAutoDisplaySwitch() {
+  if (!state.autoSwitchEnabled) return;
+  const now = Date.now();
+  if (now - state.lastAutoSwitchTime < 2500) return; // Debounce 2.5s
+
+  const usbCharging = (state.usb.usbc.active || state.usb.usba.active);
+  const dcActive = state.outputOn;
+
+  if (usbCharging && !dcActive && state.activeView === 'dc') {
+    state.lastAutoSwitchTime = now;
+    switchView('usb', true);
+  } else if (dcActive && !usbCharging && state.activeView === 'usb') {
+    state.lastAutoSwitchTime = now;
+    switchView('dc', true);
+  }
 }
 
 function updateConnectionUI(connected, labelOverride) {
@@ -436,6 +726,7 @@ function toggleMasterOutput() {
     // Clear protection alert states when user turns output back on
     state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false };
     updateTelemetryDisplays();
+    evaluateAutoDisplaySwitch();
   }
 
   if (state.connected && !state.simMode) {
@@ -559,14 +850,246 @@ function resizeCanvas() {
   }
 }
 
+function recordUsbHistoryPoint() {
+  const pt = {
+    time: Date.now(),
+    usbc_w: state.usb.usbc.w,
+    usba_w: state.usb.usba.w,
+    total_w: state.usb.usbc.w + state.usb.usba.w
+  };
+  state.usb.history.push(pt);
+
+  const cutoff = pt.time - (state.usb.timebaseSeconds * 1000) - 2000;
+  while (state.usb.history.length > 0 && state.usb.history[0].time < cutoff) {
+    state.usb.history.shift();
+  }
+}
+
+function drawUsbScope() {
+  if (!elements.usbScopeCanvas) return;
+  const canvas = elements.usbScopeCanvas;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Clear
+  ctx.fillStyle = '#04070d';
+  ctx.fillRect(0, 0, w, h);
+
+  // Background Grid
+  ctx.strokeStyle = 'rgba(0, 215, 255, 0.08)';
+  ctx.lineWidth = 1;
+  const cols = 8;
+  const rows = 5;
+  for (let c = 1; c < cols; c++) {
+    const x = (w / cols) * c;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+  for (let r = 1; r < rows; r++) {
+    const y = (h / rows) * r;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+
+  if (state.usb.history.length < 2) {
+    requestAnimationFrame(drawUsbScope);
+    return;
+  }
+
+  const now = Date.now();
+  const startTime = now - (state.usb.timebaseSeconds * 1000);
+  const maxW = Math.max(15, Math.ceil(state.usb.peakPower * 1.25));
+
+  // 1. Draw USB-C Power Trace (Cyan)
+  ctx.strokeStyle = '#00f0ff';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00f0ff';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  state.usb.history.forEach((pt, idx) => {
+    const x = ((pt.time - startTime) / (state.usb.timebaseSeconds * 1000)) * w;
+    const y = h - ((pt.usbc_w / maxW) * (h - 20)) - 10;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // 2. Draw USB-A Power Trace (Amber)
+  ctx.strokeStyle = '#ffaa00';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#ffaa00';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  state.usb.history.forEach((pt, idx) => {
+    const x = ((pt.time - startTime) / (state.usb.timebaseSeconds * 1000)) * w;
+    const y = h - ((pt.usba_w / maxW) * (h - 20)) - 10;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // 3. Draw Total Power Trace (Emerald Green, Dashed)
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00ff88';
+  ctx.shadowBlur = 8;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  state.usb.history.forEach((pt, idx) => {
+    const x = ((pt.time - startTime) / (state.usb.timebaseSeconds * 1000)) * w;
+    const y = h - ((pt.total_w / maxW) * (h - 20)) - 10;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
+
+  requestAnimationFrame(drawUsbScope);
+}
+
+function resizeUsbCanvas() {
+  if (!elements.usbScopeCanvas) return;
+  const container = elements.usbScopeCanvas.parentElement;
+  if (container) {
+    elements.usbScopeCanvas.width = container.clientWidth;
+    elements.usbScopeCanvas.height = container.clientHeight;
+  }
+}
+
+function exportUsbCsv() {
+  if (state.usb.history.length === 0) return;
+  const header = 'Timestamp,USB_C_Watt,USB_A_Watt,Total_Watt\n';
+  const rows = state.usb.history.map(r => `${new Date(r.time).toISOString()},${r.usbc_w.toFixed(2)},${r.usba_w.toFixed(2)},${r.total_w.toFixed(2)}`).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `IPS3608_USB_Log_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ==========================================================================
 // Event Listeners & Initialization
 // ==========================================================================
 
 function initEvents() {
-  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+    resizeUsbCanvas();
+  });
   resizeCanvas();
+  resizeUsbCanvas();
   requestAnimationFrame(drawScope);
+  requestAnimationFrame(drawUsbScope);
+
+  // View Tabs Navigation
+  if (elements.tabDcPower) {
+    elements.tabDcPower.addEventListener('click', () => switchView('dc'));
+  }
+  if (elements.tabUsbMonitor) {
+    elements.tabUsbMonitor.addEventListener('click', () => switchView('usb'));
+  }
+  if (elements.tabSplitView) {
+    elements.tabSplitView.addEventListener('click', () => switchView('split'));
+  }
+
+  // Auto-Switch Toggle
+  if (elements.autoSwitchCheckbox) {
+    elements.autoSwitchCheckbox.addEventListener('change', (e) => {
+      state.autoSwitchEnabled = e.target.checked;
+    });
+  }
+
+  // USB Timebase
+  if (elements.usbTimebaseSelect) {
+    elements.usbTimebaseSelect.addEventListener('change', (e) => {
+      state.usb.timebaseSeconds = parseInt(e.target.value, 10);
+    });
+  }
+
+  if (elements.btnExportUsbCsv) {
+    elements.btnExportUsbCsv.addEventListener('click', exportUsbCsv);
+  }
+
+  // USB Demo Simulation Buttons
+  if (elements.btnSimUsbCPhone) {
+    elements.btnSimUsbCPhone.addEventListener('click', () => {
+      state.usb.usbc.v = 9.15;
+      state.usb.usbc.targetA = 2.18;
+      state.usb.usbc.protocol = 'PD 3.0 (9V Schnellladung)';
+      state.usb.usbc.active = true;
+      updateUsbDisplays();
+      evaluateAutoDisplaySwitch();
+    });
+  }
+
+  if (elements.btnSimUsbCLaptop) {
+    elements.btnSimUsbCLaptop.addEventListener('click', () => {
+      state.usb.usbc.v = 19.85;
+      state.usb.usbc.targetA = 3.15;
+      state.usb.usbc.protocol = 'PD 3.0 PPS (20V / 65W Max)';
+      state.usb.usbc.active = true;
+      updateUsbDisplays();
+      evaluateAutoDisplaySwitch();
+    });
+  }
+
+  if (elements.btnSimUsbCDisconnect) {
+    elements.btnSimUsbCDisconnect.addEventListener('click', () => {
+      state.usb.usbc.v = 5.0;
+      state.usb.usbc.targetA = 0;
+      state.usb.usbc.a = 0;
+      state.usb.usbc.w = 0;
+      state.usb.usbc.protocol = 'PD 3.0 (Standby)';
+      state.usb.usbc.active = false;
+      state.usb.usbc.startTime = null;
+      updateUsbDisplays();
+      evaluateAutoDisplaySwitch();
+    });
+  }
+
+  if (elements.btnSimUsbAPhone) {
+    elements.btnSimUsbAPhone.addEventListener('click', () => {
+      state.usb.usba.v = 5.12;
+      state.usb.usba.targetA = 1.45;
+      state.usb.usba.protocol = 'Apple 2.4A / BC 1.2';
+      state.usb.usba.active = true;
+      updateUsbDisplays();
+      evaluateAutoDisplaySwitch();
+    });
+  }
+
+  if (elements.btnSimUsbAFast) {
+    elements.btnSimUsbAFast.addEventListener('click', () => {
+      state.usb.usba.v = 9.08;
+      state.usb.usba.targetA = 1.82;
+      state.usb.usba.protocol = 'Qualcomm QC 3.0 (9V/18W)';
+      state.usb.usba.active = true;
+      updateUsbDisplays();
+      evaluateAutoDisplaySwitch();
+    });
+  }
+
+  if (elements.btnSimUsbADisconnect) {
+    elements.btnSimUsbADisconnect.addEventListener('click', () => {
+      state.usb.usba.v = 5.0;
+      state.usb.usba.targetA = 0;
+      state.usb.usba.a = 0;
+      state.usb.usba.w = 0;
+      state.usb.usba.protocol = 'QC 3.0 (Standby)';
+      state.usb.usba.active = false;
+      state.usb.usba.startTime = null;
+      updateUsbDisplays();
+      evaluateAutoDisplaySwitch();
+    });
+  }
 
   // Connection
   elements.btnConnect.addEventListener('click', connectSerial);

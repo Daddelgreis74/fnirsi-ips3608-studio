@@ -235,6 +235,32 @@ class IPS3608Protocol {
           scp: p === ProtectionCode.SCP
         };
       }
+
+      // Check for Front USB Fast Charging telemetry (offsets 110-140)
+      if (frame.data.length >= 126) {
+        const usbc_v = this.bytesToFloat(frame.data, 110);
+        const usbc_a = this.bytesToFloat(frame.data, 114);
+        const usba_v = this.bytesToFloat(frame.data, 118);
+        const usba_a = this.bytesToFloat(frame.data, 122);
+        if (usbc_v >= 0 && usbc_v <= 25 && usbc_a >= 0 && usbc_a <= 6) {
+          telemetry.usb = telemetry.usb || {};
+          telemetry.usb.usbc = {
+            v: usbc_v,
+            a: usbc_a,
+            w: usbc_v * usbc_a,
+            active: usbc_a > 0.05
+          };
+        }
+        if (usba_v >= 0 && usba_v <= 15 && usba_a >= 0 && usba_a <= 4) {
+          telemetry.usb = telemetry.usb || {};
+          telemetry.usb.usba = {
+            v: usba_v,
+            a: usba_a,
+            w: usba_v * usba_a,
+            active: usba_a > 0.05
+          };
+        }
+      }
     }
 
     return telemetry;

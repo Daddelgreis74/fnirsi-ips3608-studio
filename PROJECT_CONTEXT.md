@@ -7,7 +7,7 @@ Dieses Projekt ist die eigenständige Windows Desktop Suite & Kontrollsoftware f
 
 ## 1. Projekt-Details
 - **Pfad:** `c:\Users\dadde\Documents\GitHub\FNIRSI-IPS3608\Software-Studio` (bzw. `c:\Users\dadde\Documents\GitHub\fnirsi-ips3608-studio`)
-- **Aktuelle Version:** **v1.0.1**
+- **Aktuelle Version:** **v1.1.0**
 - **Technologie:** Electron v30, Node.js, SerialPort, HTML5 Canvas
 - **Entwicklungs-Befehle:**
   - `npm start` - Startet die App im Entwicklungsmodus
