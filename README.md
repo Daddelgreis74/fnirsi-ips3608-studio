@@ -16,8 +16,6 @@ Designed as a modern, rock-solid alternative to the buggy and crash-prone offici
 - **🛡️ Rock-Solid Serial Engine:** Seamless USB-CDC COM port communication with automatic reconnection. No crashes when plugging or unplugging the USB cable during operation!
 - **⚡ Aurora Dark Tech UI:** High-contrast OLED/Digital styling matching modern workshop and laboratory environments.
 - **📊 60 FPS Real-Time Oscilloscope:** Dual-trace live canvas graph plotting Voltage (Cyan) and Current (Emerald Green) with dynamic auto-scaling.
-- **📱 Front-USB Fast Charging Monitor:** Dedicated monitor tab for Front USB-C (PD 65W/PPS) and USB-A (QC 18W/24W) with dual-trace scope, live capacity counters ($mAh$ / $Wh$), and interactive simulation.
-- **🔄 Intelligent Auto-Display Switching:** App detects USB charging activity and automatically toggles between the Laboratory Studio and Front-USB Monitor.
 - **🚨 Dynamic Protection Alerts:** Visual indicators and pulsed warning badges for OVP, OCP, OPP, OTP, and SCP.
 - **🔘 Master Safety Power Switch:** Large visual output button with tactile response and LED state indicator (Standby / Active).
 - **🎛️ Dual Setpoint Sliders & Steppers:** Easy target voltage and current adjustment via smooth sliders, quick step buttons (+/- 0.1V, +/- 1.0V), or direct numeric input.
