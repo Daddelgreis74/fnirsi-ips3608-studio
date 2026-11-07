@@ -1,14 +1,14 @@
 {
   "name": "fnirsi-ips3608-studio",
   "productName": "FNIRSI IPS3608 Studio",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Professional Windows Desktop Studio & Control Suite for the FNIRSI IPS3608 Programmable DC Power Supply",
   "main": "src/main.js",
   "author": "Daddelgreis74",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "test": "node --check src/main.js && node --check src/renderer/app.js && node --check src/renderer/protocol.js",
+    "test": "node --check src/main.js && node --check src/renderer/app.js && node --check src/renderer/protocol.js && node test/protocol.test.js",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable",
     "dist:nsis": "electron-builder --win nsis"

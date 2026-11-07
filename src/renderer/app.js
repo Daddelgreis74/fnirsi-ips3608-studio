@@ -264,15 +264,12 @@ function startPolling() {
   pollTimer = setInterval(() => {
     if (state.connected && !state.simMode) {
       pollTick++;
-      // Poll fast telemetry (10 Hz) with interleaved status/protection queries
-      if (pollTick % 4 === 0) {
-        // Full device state (0xFF) delivers protection flags, mode and output state
+      // Poll fast telemetry (10 Hz) interleaved with full status queries (5 Hz)
+      if (pollTick % 2 === 0) {
+        // Full device state (0xFF) delivers DC metrics, Ah/Wh, output state, mode and protection status (SCP/OVP/OCP/OPP/OTP)
         sendFrame(IPS3608Protocol.queryAll());
-      } else if (pollTick % 4 === 2) {
-        // Dedicated protection register query (0xDC)
-        sendFrame(IPS3608Protocol.queryProtection());
       } else {
-        // Fast 12-byte live values (0xC3)
+        // Fast 12-byte live values (0xC3) for high-responsiveness graphs
         sendFrame(IPS3608Protocol.queryLiveValues());
       }
     }

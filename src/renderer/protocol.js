@@ -196,16 +196,16 @@ class IPS3608Protocol {
     } else if (frame.register === Register.OUTPUT_STATE && frame.data.length >= 1) {
       telemetry.outputOn = frame.data[0] === 1;
     } else if (frame.register === Register.MODE && frame.data.length >= 1) {
-      telemetry.mode = frame.data[0] === 1 ? 'CC' : 'CV';
+      telemetry.mode = frame.data[0] === 1 ? 'CV' : 'CC';
     } else if (frame.register === Register.PROTECTION && frame.data.length >= 1) {
       const p = frame.data[0];
       telemetry.protection = {
         code: p,
-        ovp: p === ProtectionCode.OVP,
-        ocp: p === ProtectionCode.OCP,
-        opp: p === ProtectionCode.OPP,
-        otp: p === ProtectionCode.OTP,
-        scp: p === ProtectionCode.SCP
+        ovp: p === ProtectionCode.OVP || ((p & 0x01) !== 0 && p !== 5 && p !== 3),
+        ocp: p === ProtectionCode.OCP || (p & 0x02) !== 0,
+        opp: p === ProtectionCode.OPP || (p & 0x04) !== 0,
+        otp: p === ProtectionCode.OTP || (p & 0x08) !== 0,
+        scp: p === ProtectionCode.SCP || p === 5 || (p & 0x10) !== 0
       };
     } else if (frame.register === Register.ALL && frame.data.length >= 28) {
       // Register 0xFF full status frame
@@ -217,22 +217,22 @@ class IPS3608Protocol {
       telemetry.power = this.bytesToFloat(frame.data, 20);
       telemetry.temperature = this.bytesToFloat(frame.data, 24);
 
-      if (frame.data.length >= 104) {
-        telemetry.capacityAh = this.bytesToFloat(frame.data, 96);
-        telemetry.energyWh = this.bytesToFloat(frame.data, 100);
+      if (frame.data.length >= 107) {
+        telemetry.capacityAh = this.bytesToFloat(frame.data, 99);
+        telemetry.energyWh = this.bytesToFloat(frame.data, 103);
       }
 
-      if (frame.data.length > 109) {
+      if (frame.data.length >= 110) {
         telemetry.outputOn = frame.data[107] === 1;
-        telemetry.mode = frame.data[108] === 1 ? 'CC' : 'CV';
-        const p = frame.data[109];
+        const p = frame.data[108]; // Offset 108: Protection status (0=OK, 1=OVP, 2=OCP, 3=OPP, 4=OTP, 5=SCP)
+        telemetry.mode = frame.data[109] === 1 ? 'CV' : 'CC'; // Offset 109: Mode (1=CV, 0=CC)
         telemetry.protection = {
           code: p,
-          ovp: p === ProtectionCode.OVP,
-          ocp: p === ProtectionCode.OCP,
-          opp: p === ProtectionCode.OPP,
-          otp: p === ProtectionCode.OTP,
-          scp: p === ProtectionCode.SCP
+          ovp: p === ProtectionCode.OVP || ((p & 0x01) !== 0 && p !== 5 && p !== 3),
+          ocp: p === ProtectionCode.OCP || (p & 0x02) !== 0,
+          opp: p === ProtectionCode.OPP || (p & 0x04) !== 0,
+          otp: p === ProtectionCode.OTP || (p & 0x08) !== 0,
+          scp: p === ProtectionCode.SCP || p === 5 || (p & 0x10) !== 0
         };
       }
     }
