@@ -187,13 +187,21 @@ async function connectSerial() {
 
     updateConnectionUI(true);
 
-    // Send handshake
+    // Send connect handshake
     await sendFrame(IPS3608Protocol.connectPacket());
+    await new Promise(r => setTimeout(r, 60));
+
+    // Device initialization sync (CMD_13) required before querying Model, Firmware and Serial
+    await sendFrame(IPS3608Protocol.initHandshake());
+    await new Promise(r => setTimeout(r, 60));
 
     // Query hardware metadata (Model, Firmware version, Serial Number)
     await sendFrame(IPS3608Protocol.queryModel());
+    await new Promise(r => setTimeout(r, 60));
     await sendFrame(IPS3608Protocol.queryFirmware());
+    await new Promise(r => setTimeout(r, 60));
     await sendFrame(IPS3608Protocol.querySerial());
+    await new Promise(r => setTimeout(r, 60));
 
     // Ensure capacity accumulator is active on device
     await sendFrame(IPS3608Protocol.startCapacity());
@@ -317,6 +325,14 @@ function startPolling() {
       } else {
         // Fast 12-byte live values (0xC3) for high-responsiveness graphs
         sendFrame(IPS3608Protocol.queryLiveValues());
+      }
+
+      // Re-query device info in first 10 seconds if not yet received
+      if (!state.deviceInfo.firmware && pollTick <= 100 && pollTick % 25 === 12) {
+        sendFrame(IPS3608Protocol.initHandshake());
+        setTimeout(() => sendFrame(IPS3608Protocol.queryModel()), 40);
+        setTimeout(() => sendFrame(IPS3608Protocol.queryFirmware()), 80);
+        setTimeout(() => sendFrame(IPS3608Protocol.querySerial()), 120);
       }
     }
   }, 100); // 10 Hz refresh

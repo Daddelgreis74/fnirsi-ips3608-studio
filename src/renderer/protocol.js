@@ -133,6 +133,14 @@ class IPS3608Protocol {
   }
 
   /**
+   * Command: Device initialization sync (CMD_13: F1 B0 00 01 00 01)
+   * Essential handshake required before querying Model, Firmware and Serial strings.
+   */
+  static initHandshake() {
+    return new Uint8Array([0xF1, 0xB0, 0x00, 0x01, 0x00, 0x01]);
+  }
+
+  /**
    * Command: Poll Live Telemetry (12 Bytes: Voltage, Current, Power)
    */
   static queryLiveValues() {
@@ -238,7 +246,7 @@ class IPS3608Protocol {
     let i = 0;
 
     while (i < buffer.length) {
-      if (buffer[i] === 0xF0) {
+      if (buffer[i] === 0xF0 || buffer[i] === 0xF1) {
         // Need at least 5 bytes for header + length + checksum
         if (i + 4 >= buffer.length) break;
 
