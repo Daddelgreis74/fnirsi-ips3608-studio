@@ -3,7 +3,7 @@
 [![Build & Release](https://github.com/Daddelgreis74/fnirsi-ips3608-studio/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Daddelgreis74/fnirsi-ips3608-studio/actions/workflows/build-and-release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-brightgreen.svg)]()
-[![Electron: v30](https://img.shields.io/badge/Electron-v30.5-cyan.svg)](https://www.electronjs.org/)
+[![Electron: v45](https://img.shields.io/badge/Electron-v45-cyan.svg)](https://www.electronjs.org/)
 
 Professional Windows Desktop Studio & Control Suite for the **FNIRSI IPS3608** Programmable DC Laboratory Power Supply (0–36V / 0–8.2A).
 
