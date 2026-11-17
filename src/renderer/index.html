@@ -23,15 +23,15 @@
       </div>
       <div class="brand-text">
         <h1>FNIRSI IPS3608 <span>STUDIO</span></h1>
-        <span class="version-tag">PRO CONTROL v1.3.2</span>
+        <span class="version-tag">PRO CONTROL v1.4.0</span>
       </div>
-      <div id="deviceInfoChip" class="device-info-chip" title="Hardware-Informationen (Modell, Firmware, Seriennummer)">
+      <div id="deviceInfoChip" class="device-info-chip" data-i18n-title="header.device_info_title" title="Hardware-Informationen (Modell, Firmware, Seriennummer)">
         <span class="chip-dot"></span>
         <span id="chipModelText" class="chip-model">IPS3608</span>
         <span class="chip-sep">|</span>
-        <span id="chipFwText" class="chip-fw">FW: --</span>
+        <span id="chipFwText" class="chip-fw" data-i18n="header.fw_unknown">FW: --</span>
         <span class="chip-sep">|</span>
-        <span id="chipSnText" class="chip-sn">SN: --</span>
+        <span id="chipSnText" class="chip-sn" data-i18n="header.sn_unknown">SN: --</span>
       </div>
     </div>
 
@@ -39,38 +39,36 @@
     <div class="header-center">
       <div id="outputPill" class="output-status-pill status-off">
         <span class="status-dot"></span>
-        <span id="outputPillText">AUSGANG AUS (STANDBY)</span>
+        <span id="outputPillText" data-i18n="header.output_off">AUSGANG AUS (STANDBY)</span>
       </div>
     </div>
 
-    <!-- Serial Connection Toolbar -->
+    <!-- Serial Connection Toolbar & Language Selector -->
     <div class="connection-bar">
-      <div class="sim-toggle-wrapper" title="Simulationsmodus für Tests ohne Hardware">
-        <label class="switch">
-          <input type="checkbox" id="simModeCheckbox">
-          <span class="slider round"></span>
-        </label>
-        <span class="sim-label">Demo</span>
-      </div>
+      <select class="lang-select" id="selLanguage" data-i18n-title="header.language" title="Sprache">
+        <option value="de">Deutsch</option>
+        <option value="en">English</option>
+        <option value="fr">Français</option>
+      </select>
 
       <div class="port-select-wrapper">
         <select id="comPortSelect" class="port-select">
-          <option value="">Port wählen / WebSerial...</option>
+          <option value="" data-i18n="header.port_placeholder">Suche USB-Port...</option>
         </select>
-        <button id="btnRefreshPorts" class="icon-btn" title="COM-Ports neu scannen">🔄</button>
+        <button id="btnRefreshPorts" class="icon-btn" data-i18n-title="header.rescan_title" title="COM-Ports neu scannen">🔄</button>
       </div>
 
-      <button id="btnOpenProtectionModal" class="btn btn-tool" title="Hardware-Schutzgrenzen im EEPROM einstellen (OVP, OCP, OPP, OTP, LVP)">
-        <span>⚙️ Schutzgrenzen</span>
+      <button id="btnOpenProtectionModal" class="btn btn-tool" data-i18n-title="header.limits_title" title="Hardware-Schutzgrenzen im EEPROM einstellen (OVP, OCP, OPP, OTP, LVP)">
+        <span data-i18n="header.limits_btn">⚙️ Schutzgrenzen</span>
       </button>
 
-      <button id="btnBootloader" class="btn btn-tool btn-tool-danger" title="IPS3608 in Firmware-Bootloader versetzen (CMD_15)">
-        <span>⚡ Bootloader</span>
+      <button id="btnBootloader" class="btn btn-tool btn-tool-danger" data-i18n-title="header.bootloader_title" title="IPS3608 in Firmware-Bootloader versetzen (CMD_15)">
+        <span data-i18n="header.bootloader_btn">⚡ Bootloader</span>
       </button>
 
       <button id="btnConnect" class="btn btn-connect">
         <span class="btn-icon">⚡</span>
-        <span id="btnConnectText">Verbinden</span>
+        <span id="btnConnectText" data-i18n="header.connect">Verbinden</span>
       </button>
     </div>
   </header>
@@ -80,7 +78,7 @@
     <!-- LEFT: Large Live Telemetry Instruments -->
     <section class="panel dc-panel telemetry-panel">
       <div class="panel-header">
-        <h2>IST-WERTE (TELEMETRIE)</h2>
+        <h2 data-i18n="telemetry.title">IST-WERTE (TELEMETRIE)</h2>
         <div class="badge-cluster">
           <span id="modeBadge" class="badge badge-cv">CV MODUS</span>
           <span id="tempBadge" class="badge badge-temp">🌡️ --.- °C</span>
@@ -92,8 +90,8 @@
         <!-- Voltage -->
         <div class="meter-card meter-voltage">
           <div class="meter-meta">
-            <span class="meter-title">SPANNUNG</span>
-            <span class="meter-unit">VOLT</span>
+            <span class="meter-title" data-i18n="telemetry.voltage">SPANNUNG</span>
+            <span class="meter-unit" data-i18n="telemetry.unit_volt">VOLT</span>
           </div>
           <div class="meter-value" id="dispActualVoltage">00.000</div>
           <div class="meter-bar">
@@ -104,8 +102,8 @@
         <!-- Current -->
         <div class="meter-card meter-current">
           <div class="meter-meta">
-            <span class="meter-title">STROM</span>
-            <span class="meter-unit">AMPERE</span>
+            <span class="meter-title" data-i18n="telemetry.current">STROM</span>
+            <span class="meter-unit" data-i18n="telemetry.unit_ampere">AMPERE</span>
           </div>
           <div class="meter-value" id="dispActualCurrent">0.0000</div>
           <div class="meter-bar">
@@ -116,8 +114,8 @@
         <!-- Power -->
         <div class="meter-card meter-power">
           <div class="meter-meta">
-            <span class="meter-title">LEISTUNG</span>
-            <span class="meter-unit">WATT</span>
+            <span class="meter-title" data-i18n="telemetry.power">LEISTUNG</span>
+            <span class="meter-unit" data-i18n="telemetry.unit_watt">WATT</span>
           </div>
           <div class="meter-value" id="dispActualPower">00.00</div>
           <div class="meter-bar">
@@ -131,29 +129,29 @@
         <div class="accumulator-header">
           <div class="acc-title-group">
             <span class="acc-icon">⚡</span>
-            <span class="acc-title">KAPAZITÄT & ENERGIE</span>
+            <span class="acc-title" data-i18n="acc.title">KAPAZITÄT & ENERGIE</span>
           </div>
-          <button id="btnResetCapacity" class="btn-acc-reset" title="Hardware Ah/Wh Zähler im Gerät auf 0 zurücksetzen (CMD_11)">
-            <span class="reset-icon">↺</span> Zähler Reset
+          <button id="btnResetCapacity" class="btn-acc-reset" data-i18n-title="acc.reset_title" title="Hardware Ah/Wh Zähler im Gerät auf 0 zurücksetzen (CMD_11)">
+            <span class="reset-icon">↺</span> <span data-i18n="acc.reset_btn">Zähler Reset</span>
           </button>
         </div>
 
         <div class="accumulator-grid">
           <!-- Capacity Ah -->
           <div class="acc-stat-box">
-            <span class="acc-label">KAPAZITÄT</span>
+            <span class="acc-label" data-i18n="acc.capacity">KAPAZITÄT</span>
             <span id="dispCapacityAh" class="acc-val">0.000 Ah</span>
           </div>
 
           <!-- Energy Wh -->
           <div class="acc-stat-box">
-            <span class="acc-label">ENERGIE</span>
+            <span class="acc-label" data-i18n="acc.energy">ENERGIE</span>
             <span id="dispEnergyWh" class="acc-val">0.000 Wh</span>
           </div>
 
           <!-- Active Output Runtime -->
           <div class="acc-stat-box acc-stat-full">
-            <span class="acc-label">LAUFZEIT (OUTPUT AKTIV)</span>
+            <span class="acc-label" data-i18n="acc.runtime">LAUFZEIT (OUTPUT AKTIV)</span>
             <span id="dispUptime" class="acc-val acc-val-time">00:00:00</span>
           </div>
         </div>
@@ -161,11 +159,11 @@
 
       <!-- Protections Indicators -->
       <div class="protections-bar">
-        <span id="flagOvp" class="flag-pill" title="Überspannungsschutz (Code 1 / OVP)">OVP</span>
-        <span id="flagOcp" class="flag-pill" title="Überstromsschutz (Code 2 / OCP)">OCP</span>
-        <span id="flagOpp" class="flag-pill" title="Überleistungsschutz (Code 3 / OPP)">OPP</span>
-        <span id="flagOtp" class="flag-pill" title="Übertemperaturschutz (Code 4 / OTP)">OTP</span>
-        <span id="flagScp" class="flag-pill" title="Unterspannung / Kurzschlussschutz (Code 5 / LVP / Kurzschluss)">LVP / SCP</span>
+        <span id="flagOvp" class="flag-pill" data-i18n-title="prot.ovp_title" title="Überspannungsschutz (Code 1 / OVP)">OVP</span>
+        <span id="flagOcp" class="flag-pill" data-i18n-title="prot.ocp_title" title="Überstromschutz (Code 2 / OCP)">OCP</span>
+        <span id="flagOpp" class="flag-pill" data-i18n-title="prot.opp_title" title="Überleistungsschutz (Code 3 / OPP)">OPP</span>
+        <span id="flagOtp" class="flag-pill" data-i18n-title="prot.otp_title" title="Übertemperaturschutz (Code 4 / OTP)">OTP</span>
+        <span id="flagScp" class="flag-pill" data-i18n="prot.scp_label" data-i18n-title="prot.scp_title" title="Unterspannung / Kurzschlussschutz (Code 5 / LVP / Kurzschluss)">LVP / SCP</span>
       </div>
     </section>
 
@@ -179,7 +177,7 @@
             <svg class="power-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
             </svg>
-            <span id="btnMasterPowerLabel">AUSGANG EINSCHALTEN</span>
+            <span id="btnMasterPowerLabel" data-i18n="control.power_off">AUSGANG EINSCHALTEN</span>
           </div>
         </button>
       </div>
@@ -189,7 +187,7 @@
         <!-- Target Voltage -->
         <div class="setpoint-card">
           <div class="setpoint-head">
-            <span class="label">SOLL-SPANNUNG</span>
+            <span class="label" data-i18n="control.target_voltage">SOLL-SPANNUNG</span>
             <div class="input-display">
               <input type="number" id="inputTargetVoltage" min="0" max="36" step="0.01" value="12.00">
               <span class="unit">V</span>
@@ -209,7 +207,7 @@
         <!-- Target Current Limit -->
         <div class="setpoint-card">
           <div class="setpoint-head">
-            <span class="label">STROM-LIMIT (MAX)</span>
+            <span class="label" data-i18n="control.target_current">STROM-LIMIT (MAX)</span>
             <div class="input-display">
               <input type="number" id="inputTargetCurrent" min="0" max="8.2" step="0.01" value="2.00">
               <span class="unit">A</span>
@@ -230,7 +228,7 @@
       <!-- Quick Preset Buttons Grid -->
       <div class="presets-section">
         <div class="presets-header">
-          <span>SCHNELLWAHL-PRESETS</span>
+          <span data-i18n="control.presets">SCHNELLWAHL-PRESETS</span>
         </div>
         <div class="preset-grid">
           <button class="preset-btn" data-v="3.3" data-a="1.0">3.3V / 1A</button>
@@ -249,17 +247,17 @@
     <section class="panel dc-panel scope-panel">
       <div class="panel-header">
         <div class="scope-legend">
-          <h2>ECHTZEIT-GRAPH (SCOPE)</h2>
-          <span class="legend-item legend-v"><span class="dot"></span> Spannung (V)</span>
-          <span class="legend-item legend-a"><span class="dot"></span> Strom (A)</span>
+          <h2 data-i18n="scope.title">ECHTZEIT-GRAPH (SCOPE)</h2>
+          <span class="legend-item legend-v"><span class="dot"></span> <span data-i18n="scope.legend_v">Spannung (V)</span></span>
+          <span class="legend-item legend-a"><span class="dot"></span> <span data-i18n="scope.legend_a">Strom (A)</span></span>
         </div>
         <div class="scope-controls">
-          <label>Zeitfenster:</label>
+          <label data-i18n="scope.timewindow">Zeitfenster:</label>
           <select id="timebaseSelect" class="timebase-select">
-            <option value="10">10 Sek</option>
-            <option value="30" selected>30 Sek</option>
-            <option value="60">60 Sek</option>
-            <option value="120">2 Min</option>
+            <option value="10" data-i18n="scope.sec_10">10 Sek</option>
+            <option value="30" selected data-i18n="scope.sec_30">30 Sek</option>
+            <option value="60" data-i18n="scope.sec_60">60 Sek</option>
+            <option value="120" data-i18n="scope.min_2">2 Min</option>
           </select>
         </div>
       </div>
@@ -274,12 +272,12 @@
         <div class="logger-status">
           <button id="btnToggleLog" class="btn btn-record">
             <span class="rec-dot"></span>
-            <span id="btnRecordText">Aufnahme starten</span>
+            <span id="btnRecordText" data-i18n="scope.rec_start">Aufnahme starten</span>
           </button>
-          <span id="logCounter" class="log-info">0 Datenpunkte aufgezeichnet</span>
+          <span id="logCounter" class="log-info" data-i18n="scope.log_count_init">0 Datenpunkte aufgezeichnet</span>
         </div>
         <button id="btnExportCsv" class="btn btn-export" disabled>
-          <span>📥 CSV Exportieren</span>
+          <span data-i18n="scope.export_csv">📥 CSV Exportieren</span>
         </button>
       </div>
     </section>
@@ -290,17 +288,17 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title-group">
-          <h3>⚙️ HARDWARE-SCHUTZGRENZEN</h3>
-          <span class="modal-subtitle">Schwellenwerte direkt im EEPROM des IPS3608 programmieren (Registers 0xD1–0xD5)</span>
+          <h3 data-i18n="modal.title">⚙️ HARDWARE-SCHUTZGRENZEN</h3>
+          <span class="modal-subtitle" data-i18n="modal.subtitle">Schwellenwerte direkt im EEPROM des IPS3608 programmieren (Registers 0xD1–0xD5)</span>
         </div>
-        <button id="btnCloseProtectionModal" class="modal-close-btn" title="Schließen">&times;</button>
+        <button id="btnCloseProtectionModal" class="modal-close-btn" data-i18n-title="modal.close" title="Schließen">&times;</button>
       </div>
 
       <div class="modal-body">
         <div class="protection-field">
           <div class="field-label-group">
-            <label for="inputLimitOvp">OVP – Überspannungsschutz</label>
-            <span class="field-hint">Abschaltung bei Überschreiten dieser Ausgangsspannung</span>
+            <label for="inputLimitOvp" data-i18n="modal.ovp_label">OVP – Überspannungsschutz</label>
+            <span class="field-hint" data-i18n="modal.ovp_hint">Abschaltung bei Überschreiten dieser Ausgangsspannung</span>
           </div>
           <div class="field-input-group">
             <input type="number" id="inputLimitOvp" min="0.0" max="38.0" step="0.1" value="38.00">
@@ -310,8 +308,8 @@
 
         <div class="protection-field">
           <div class="field-label-group">
-            <label for="inputLimitOcp">OCP – Überstromschutz</label>
-            <span class="field-hint">Abschaltung bei Überschreiten dieses Ausgangsstroms</span>
+            <label for="inputLimitOcp" data-i18n="modal.ocp_label">OCP – Überstromschutz</label>
+            <span class="field-hint" data-i18n="modal.ocp_hint">Abschaltung bei Überschreiten dieses Ausgangsstroms</span>
           </div>
           <div class="field-input-group">
             <input type="number" id="inputLimitOcp" min="0.0" max="8.5" step="0.01" value="8.20">
@@ -321,8 +319,8 @@
 
         <div class="protection-field">
           <div class="field-label-group">
-            <label for="inputLimitOpp">OPP – Überleistungsschutz</label>
-            <span class="field-hint">Abschaltung bei Überschreiten dieser Gesamtleistung</span>
+            <label for="inputLimitOpp" data-i18n="modal.opp_label">OPP – Überleistungsschutz</label>
+            <span class="field-hint" data-i18n="modal.opp_hint">Abschaltung bei Überschreiten dieser Gesamtleistung</span>
           </div>
           <div class="field-input-group">
             <input type="number" id="inputLimitOpp" min="0.0" max="320.0" step="1.0" value="300.0">
@@ -332,8 +330,8 @@
 
         <div class="protection-field">
           <div class="field-label-group">
-            <label for="inputLimitOtp">OTP – Übertemperaturschutz</label>
-            <span class="field-hint">Abschaltung bei Kühlkörpertemperatur</span>
+            <label for="inputLimitOtp" data-i18n="modal.otp_label">OTP – Übertemperaturschutz</label>
+            <span class="field-hint" data-i18n="modal.otp_hint">Abschaltung bei Kühlkörpertemperatur</span>
           </div>
           <div class="field-input-group">
             <input type="number" id="inputLimitOtp" min="30.0" max="95.0" step="1.0" value="80.0">
@@ -343,8 +341,8 @@
 
         <div class="protection-field">
           <div class="field-label-group">
-            <label for="inputLimitLvp">LVP – Unterspannungsschutz / Kurzschluss</label>
-            <span class="field-hint">Abschaltung bei Spannungseinbruch (0.00 V = inaktiv/Default)</span>
+            <label for="inputLimitLvp" data-i18n="modal.lvp_label">LVP – Unterspannungsschutz / Kurzschluss</label>
+            <span class="field-hint" data-i18n="modal.lvp_hint">Abschaltung bei Spannungseinbruch (0.00 V = inaktiv/Default)</span>
           </div>
           <div class="field-input-group">
             <input type="number" id="inputLimitLvp" min="0.0" max="36.0" step="0.1" value="0.00">
@@ -356,16 +354,20 @@
       </div>
 
       <div class="modal-footer">
-        <button id="btnRefreshProtectionLimits" class="btn btn-secondary" title="Schutzgrenzen aus dem Gerät abfragen">
-          <span>🔄 Neu auslesen</span>
+        <button id="btnRefreshProtectionLimits" class="btn btn-secondary" data-i18n-title="modal.refresh_title" title="Schutzgrenzen aus dem Gerät abfragen">
+          <span data-i18n="modal.refresh_btn">🔄 Neu auslesen</span>
         </button>
-        <button id="btnSaveProtectionLimits" class="btn btn-primary" title="Werte in die Register des Netzteils flashen">
-          <span>💾 Im Gerät speichern</span>
+        <button id="btnSaveProtectionLimits" class="btn btn-primary" data-i18n-title="modal.save_title" title="Werte in die Register des Netzteils flashen">
+          <span data-i18n="modal.save_btn">💾 Im Gerät speichern</span>
         </button>
       </div>
     </div>
   </div>
 
+  <script src="../i18n/core.js"></script>
+  <script src="../i18n/locales/de.js"></script>
+  <script src="../i18n/locales/en.js"></script>
+  <script src="../i18n/locales/fr.js"></script>
   <script src="protocol.js"></script>
   <script src="app.js"></script>
 </body>

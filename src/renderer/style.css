@@ -1134,3 +1134,22 @@ input:checked + .slider.round:before { transform: translateX(14px); }
   box-shadow: 0 4px 16px rgba(0, 212, 255, 0.5);
   transform: translateY(-1px);
 }
+
+/* Language Selector */
+.lang-select {
+  background: rgba(18, 28, 48, 0.85);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.lang-select:hover,
+.lang-select:focus {
+  border-color: var(--color-cyan);
+}

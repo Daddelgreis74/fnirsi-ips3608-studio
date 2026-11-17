@@ -2,10 +2,24 @@
  * FNIRSI IPS3608 Studio - Main Renderer Application
  */
 
+const { ipcRenderer } = (typeof require !== 'undefined') ? require('electron') : { ipcRenderer: null };
+
+// ==========================================================================
+// i18n Initialization (German, English, French)
+// ==========================================================================
+const LANGUAGES = ['de', 'en', 'fr'];
+const translator = I18nCore.createTranslator(
+  I18nLocales,
+  I18nCore.resolveLanguage(localStorage.getItem('language'), navigator.language, LANGUAGES)
+);
+const t = translator.t;
+
 // Application State
 const state = {
   connected: false,
-  simMode: false,
+  connecting: false,
+  manualDisconnect: false,
+  detectedPortName: null,
   outputOn: false,
   targetVoltage: 12.00,
   targetCurrent: 2.00,
@@ -17,18 +31,19 @@ const state = {
   capacityAh: 0.00,
   energyWh: 0.00,
   startTime: null,
-  
+
   // Serial Port References
   port: null,
   reader: null,
   writer: null,
   keepReading: false,
   readBuffer: new Uint8Array(0),
-  
+  pnpPorts: [],
+
   // Data Logger
   logging: false,
   logData: [],
-  
+
   // Protection Status
   protection: {
     code: 0,
@@ -36,7 +51,8 @@ const state = {
     ocp: false,
     opp: false,
     otp: false,
-    scp: false
+    scp: false,
+    lvp: false
   },
 
   // Scope Waveform History
@@ -62,6 +78,8 @@ const state = {
 
 // UI Element References
 const elements = {
+  selLanguage: document.getElementById('selLanguage'),
+
   // Device Info Chip
   deviceInfoChip: document.getElementById('deviceInfoChip'),
   chipModelText: document.getElementById('chipModelText'),
@@ -74,20 +92,19 @@ const elements = {
   btnConnectText: document.getElementById('btnConnectText'),
   comPortSelect: document.getElementById('comPortSelect'),
   btnRefreshPorts: document.getElementById('btnRefreshPorts'),
-  simModeCheckbox: document.getElementById('simModeCheckbox'),
-  
+
   outputPill: document.getElementById('outputPill'),
   outputPillText: document.getElementById('outputPillText'),
   btnMasterPower: document.getElementById('btnMasterPower'),
   btnMasterPowerLabel: document.getElementById('btnMasterPowerLabel'),
-  
+
   dispActualVoltage: document.getElementById('dispActualVoltage'),
   dispActualCurrent: document.getElementById('dispActualCurrent'),
   dispActualPower: document.getElementById('dispActualPower'),
   barVoltage: document.getElementById('barVoltage'),
   barCurrent: document.getElementById('barCurrent'),
   barPower: document.getElementById('barPower'),
-  
+
   modeBadge: document.getElementById('modeBadge'),
   tempBadge: document.getElementById('tempBadge'),
   dispCapacityAh: document.getElementById('dispCapacityAh'),
@@ -113,12 +130,12 @@ const elements = {
   inputLimitOpp: document.getElementById('inputLimitOpp'),
   inputLimitOtp: document.getElementById('inputLimitOtp'),
   inputLimitLvp: document.getElementById('inputLimitLvp'),
-  
+
   inputTargetVoltage: document.getElementById('inputTargetVoltage'),
   sliderVoltage: document.getElementById('sliderVoltage'),
   inputTargetCurrent: document.getElementById('inputTargetCurrent'),
   sliderCurrent: document.getElementById('sliderCurrent'),
-  
+
   scopeCanvas: document.getElementById('scopeCanvas'),
   timebaseSelect: document.getElementById('timebaseSelect'),
   btnToggleLog: document.getElementById('btnToggleLog'),
@@ -128,55 +145,145 @@ const elements = {
 };
 
 // ==========================================================================
-// Serial Communication Engine (Web Serial API)
+// Serial Communication & Auto-Detection Engine
 // ==========================================================================
+
+async function scanSystemComPorts() {
+  if (!ipcRenderer) return [];
+  try {
+    const ports = await ipcRenderer.invoke('serial:scan-pnp-ports');
+    state.pnpPorts = Array.isArray(ports) ? ports : [];
+    return state.pnpPorts;
+  } catch (err) {
+    console.warn('PnP scan failed:', err);
+    return [];
+  }
+}
 
 async function refreshPortList() {
   if (!navigator.serial) return;
   try {
-    const ports = await navigator.serial.getPorts();
-    elements.comPortSelect.innerHTML = '<option value="">COM-Port auswählen...</option>';
-    
-    ports.forEach((p, idx) => {
-      const info = p.getInfo();
-      const usbVendor = info.usbVendorId ? `(VID: 0x${info.usbVendorId.toString(16)})` : '';
+    const [webPorts, pnpPorts] = await Promise.all([
+      navigator.serial.getPorts(),
+      scanSystemComPorts()
+    ]);
+
+    const prevValue = elements.comPortSelect.value;
+    elements.comPortSelect.innerHTML = '';
+
+    const optAuto = document.createElement('option');
+    optAuto.value = 'auto';
+    optAuto.textContent = pnpPorts.length > 0
+      ? `⚡ ${t('header.port_auto')} (${pnpPorts[0].comPort})`
+      : t('header.port_placeholder');
+    elements.comPortSelect.appendChild(optAuto);
+
+    // Show detected PnP COM ports with descriptive names
+    pnpPorts.forEach((p) => {
       const opt = document.createElement('option');
-      opt.value = idx;
-      opt.textContent = `Gerät #${idx + 1} ${usbVendor}`;
+      opt.value = `pnp:${p.comPort}`;
+      const vidTag = p.vid ? ` [VID:${p.vid.toUpperCase()}]` : '';
+      opt.textContent = `${p.comPort} – ${p.name}${vidTag}`;
       elements.comPortSelect.appendChild(opt);
     });
 
+    // Also include already-granted Web Serial ports if no PnP entries exist
+    if (pnpPorts.length === 0) {
+      webPorts.forEach((p, idx) => {
+        const info = p.getInfo();
+        const usbVendor = info.usbVendorId ? `(VID: 0x${info.usbVendorId.toString(16)})` : '';
+        const opt = document.createElement('option');
+        opt.value = `web:${idx}`;
+        opt.textContent = `${t('header.port_device', { idx: idx + 1 })} ${usbVendor}`;
+        elements.comPortSelect.appendChild(opt);
+      });
+    }
+
     const optRequest = document.createElement('option');
     optRequest.value = 'request';
-    optRequest.textContent = '➕ Neuen COM-Port hinzufügen...';
+    optRequest.textContent = t('header.port_add');
     elements.comPortSelect.appendChild(optRequest);
+
+    if (prevValue && Array.from(elements.comPortSelect.options).some(o => o.value === prevValue)) {
+      elements.comPortSelect.value = prevValue;
+    } else {
+      elements.comPortSelect.value = 'auto';
+    }
   } catch (err) {
     console.error('Error fetching ports:', err);
   }
 }
 
-async function connectSerial() {
+async function autoScanAndConnect() {
+  if (state.connected || state.connecting || state.manualDisconnect) return;
+  if (!navigator.serial) return;
+
+  try {
+    const pnpPorts = await scanSystemComPorts();
+    const webPorts = await navigator.serial.getPorts();
+
+    // Prioritize USB serial ports detected by Windows PnP, or previously granted Web Serial ports
+    const usbPort = pnpPorts.find(p => p.isKnownUsb || p.isUsb);
+    if (usbPort) {
+      await refreshPortList();
+      if (ipcRenderer) {
+        await ipcRenderer.invoke('serial:set-preferred-port', usbPort.comPort);
+      }
+      state.detectedPortName = usbPort.comPort;
+      await connectSerial(true);
+    } else if (webPorts.length > 0) {
+      await refreshPortList();
+      await connectSerial(true);
+    }
+  } catch (err) {
+    console.debug('Auto-scan pass:', err.message);
+  }
+}
+
+async function connectSerial(silent = false) {
   if (state.connected) {
+    state.manualDisconnect = true;
     await disconnectSerial();
     return;
   }
 
-  if (state.simMode) {
-    startSimulation();
-    return;
-  }
+  if (state.connecting) return;
+  state.connecting = true;
+  state.manualDisconnect = false;
 
   try {
     let port = null;
     const selectedVal = elements.comPortSelect.value;
     const availablePorts = await navigator.serial.getPorts();
 
-    if (selectedVal === 'request' || availablePorts.length === 0) {
+    if (selectedVal.startsWith('pnp:') && ipcRenderer) {
+      const comName = selectedVal.slice(4);
+      state.detectedPortName = comName;
+      await ipcRenderer.invoke('serial:set-preferred-port', comName);
       port = await navigator.serial.requestPort();
-    } else if (availablePorts[selectedVal]) {
-      port = availablePorts[selectedVal];
+    } else if (selectedVal === 'request') {
+      if (ipcRenderer) await ipcRenderer.invoke('serial:set-preferred-port', null);
+      port = await navigator.serial.requestPort();
+    } else if (selectedVal.startsWith('web:')) {
+      const idx = parseInt(selectedVal.slice(4), 10);
+      port = availablePorts[idx] || await navigator.serial.requestPort();
     } else {
-      port = await navigator.serial.requestPort();
+      // Auto mode: prefer matching PnP USB port if detected, else first available Web Serial port
+      if (state.pnpPorts.length > 0 && ipcRenderer) {
+        const best = state.pnpPorts.find(p => p.isKnownUsb || p.isUsb) || state.pnpPorts[0];
+        state.detectedPortName = best.comPort;
+        await ipcRenderer.invoke('serial:set-preferred-port', best.comPort);
+        port = await navigator.serial.requestPort();
+      } else if (availablePorts.length > 0) {
+        port = availablePorts[0];
+      } else if (!silent) {
+        port = await navigator.serial.requestPort();
+      }
+    }
+
+    if (!port) {
+      state.connecting = false;
+      return;
     }
 
     await port.open({ baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none' });
@@ -213,8 +320,12 @@ async function connectSerial() {
     startPolling();
   } catch (err) {
     console.error('Serial connection failed:', err);
-    alert('Verbindungsfehler: ' + err.message);
+    if (!silent) {
+      alert(t('dialog.connect_error', { message: err.message }));
+    }
     updateConnectionUI(false);
+  } finally {
+    state.connecting = false;
   }
 }
 
@@ -222,14 +333,9 @@ async function disconnectSerial() {
   state.keepReading = false;
   state.connected = false;
 
-  if (state.simTimer) {
-    clearInterval(state.simTimer);
-    state.simTimer = null;
-  }
-
-  if (state.pollTimer) {
-    clearInterval(state.pollTimer);
-    state.pollTimer = null;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
 
   try {
@@ -285,7 +391,6 @@ async function readLoop() {
 }
 
 function handleIncomingBytes(chunk) {
-  // Append to readBuffer
   const combined = new Uint8Array(state.readBuffer.length + chunk.length);
   combined.set(state.readBuffer);
   combined.set(chunk, state.readBuffer.length);
@@ -316,14 +421,12 @@ function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
   pollTick = 0;
   pollTimer = setInterval(() => {
-    if (state.connected && !state.simMode) {
+    if (state.connected) {
       pollTick++;
       // Poll fast telemetry (10 Hz) interleaved with full status queries (5 Hz)
       if (pollTick % 2 === 0) {
-        // Full device state (0xFF) delivers DC metrics, Ah/Wh, output state, mode and protection status (SCP/OVP/OCP/OPP/OTP)
         sendFrame(IPS3608Protocol.queryAll());
       } else {
-        // Fast 12-byte live values (0xC3) for high-responsiveness graphs
         sendFrame(IPS3608Protocol.queryLiveValues());
       }
 
@@ -336,50 +439,6 @@ function startPolling() {
       }
     }
   }, 100); // 10 Hz refresh
-}
-
-// ==========================================================================
-// Simulation / Demo Mode
-// ==========================================================================
-
-function startSimulation() {
-  state.connected = true;
-  state.deviceInfo = {
-    model: 'IPS3608',
-    firmware: 'V1.9_DEMO',
-    serial: 'SN-DEMO-260429'
-  };
-  updateConnectionUI(true, 'Demo-Modus aktiv');
-
-  if (state.simTimer) clearInterval(state.simTimer);
-  let step = 0;
-
-  state.simTimer = setInterval(() => {
-    step += 0.05;
-    if (state.outputOn) {
-      // Simulate realistic voltage and load ripple
-      const rippleV = (Math.sin(step * 3) * 0.008) + ((Math.random() - 0.5) * 0.003);
-      state.actualVoltage = Math.max(0, state.targetVoltage + rippleV);
-
-      const baseCurrent = Math.min(state.targetCurrent, (state.targetVoltage / 10.0));
-      const rippleA = (Math.cos(step * 2) * 0.015) + ((Math.random() - 0.5) * 0.004);
-      state.actualCurrent = Math.max(0, baseCurrent + rippleA);
-      state.actualPower = state.actualVoltage * state.actualCurrent;
-
-      // Accumulate capacity
-      state.capacityAh += (state.actualCurrent * (0.05 / 3600));
-      state.energyWh += (state.actualPower * (0.05 / 3600));
-      state.mode = state.actualCurrent >= state.targetCurrent ? 'CC' : 'CV';
-    } else {
-      state.actualVoltage = 0.00;
-      state.actualCurrent = 0.00;
-      state.actualPower = 0.00;
-      state.mode = 'CV';
-    }
-
-    updateTelemetryDisplays();
-    recordHistoryPoint();
-  }, 50); // 20 Hz
 }
 
 // ==========================================================================
@@ -427,7 +486,7 @@ function updateTelemetryDisplays() {
   elements.barPower.style.width = Math.min(100, (state.actualPower / 300.0) * 100) + '%';
 
   // Badges
-  elements.modeBadge.textContent = state.mode + ' MODUS';
+  elements.modeBadge.textContent = `${state.mode} ${t('telemetry.mode_suffix')}`;
   elements.modeBadge.className = 'badge ' + (state.mode === 'CC' ? 'badge-cc' : 'badge-cv');
   elements.tempBadge.textContent = `🌡️ ${state.temperature.toFixed(1)} °C`;
 
@@ -440,6 +499,8 @@ function updateTelemetryDisplays() {
     const m = String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0');
     const s = String(elapsedSec % 60).padStart(2, '0');
     elements.dispUptime.textContent = `${h}:${m}:${s}`;
+  } else {
+    elements.dispUptime.textContent = '00:00:00';
   }
 
   // Device Info Chip
@@ -447,10 +508,10 @@ function updateTelemetryDisplays() {
     elements.chipModelText.textContent = state.deviceInfo.model;
   }
   if (elements.chipFwText) {
-    elements.chipFwText.textContent = state.deviceInfo.firmware ? (`FW: ${state.deviceInfo.firmware}`) : 'FW: --';
+    elements.chipFwText.textContent = state.deviceInfo.firmware ? (`FW: ${state.deviceInfo.firmware}`) : t('header.fw_unknown');
   }
   if (elements.chipSnText) {
-    elements.chipSnText.textContent = state.deviceInfo.serial ? (`SN: ${state.deviceInfo.serial}`) : 'SN: --';
+    elements.chipSnText.textContent = state.deviceInfo.serial ? (`SN: ${state.deviceInfo.serial}`) : t('header.sn_unknown');
   }
 
   // Protection Pills (OVP, OCP, OPP, OTP, LVP / SCP)
@@ -462,14 +523,15 @@ function updateTelemetryDisplays() {
   if (elements.flagScp) elements.flagScp.classList.toggle('flag-alert', !!(prot.scp || prot.lvp));
 }
 
-function updateConnectionUI(connected, labelOverride) {
+function updateConnectionUI(connected) {
   state.connected = connected;
   if (connected) {
     elements.btnConnect.classList.replace('btn-connect', 'btn-disconnect');
-    elements.btnConnectText.textContent = labelOverride || 'Trennen';
+    const portTag = state.detectedPortName ? ` (${state.detectedPortName})` : '';
+    elements.btnConnectText.textContent = t('header.disconnect') + portTag;
   } else {
     elements.btnConnect.classList.replace('btn-disconnect', 'btn-connect');
-    elements.btnConnectText.textContent = 'Verbinden';
+    elements.btnConnectText.textContent = t('header.connect');
   }
 }
 
@@ -478,15 +540,15 @@ function updateOutputState(on) {
   if (on) {
     if (!state.startTime) state.startTime = Date.now();
     elements.outputPill.className = 'output-status-pill status-on';
-    elements.outputPillText.textContent = 'AUSGANG AKTIV (ON)';
+    elements.outputPillText.textContent = t('header.output_on');
     elements.btnMasterPower.className = 'master-power-btn btn-power-on';
-    elements.btnMasterPowerLabel.textContent = 'AUSGANG ABSCHALTEN';
+    elements.btnMasterPowerLabel.textContent = t('control.power_on');
   } else {
     state.startTime = null;
     elements.outputPill.className = 'output-status-pill status-off';
-    elements.outputPillText.textContent = 'AUSGANG AUS (STANDBY)';
+    elements.outputPillText.textContent = t('header.output_off');
     elements.btnMasterPower.className = 'master-power-btn btn-power-off';
-    elements.btnMasterPowerLabel.textContent = 'AUSGANG EINSCHALTEN';
+    elements.btnMasterPowerLabel.textContent = t('control.power_off');
   }
 }
 
@@ -500,7 +562,7 @@ function setTargetVoltage(v) {
   elements.inputTargetVoltage.value = val.toFixed(2);
   elements.sliderVoltage.value = val;
 
-  if (state.connected && !state.simMode) {
+  if (state.connected) {
     sendFrame(IPS3608Protocol.setVoltage(val));
   }
 }
@@ -511,7 +573,7 @@ function setTargetCurrent(a) {
   elements.inputTargetCurrent.value = val.toFixed(2);
   elements.sliderCurrent.value = val;
 
-  if (state.connected && !state.simMode) {
+  if (state.connected) {
     sendFrame(IPS3608Protocol.setCurrent(val));
   }
 }
@@ -521,12 +583,11 @@ function toggleMasterOutput() {
   updateOutputState(newState);
 
   if (newState) {
-    // Clear protection alert states when user turns output back on
-    state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false };
+    state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false, lvp: false };
     updateTelemetryDisplays();
   }
 
-  if (state.connected && !state.simMode) {
+  if (state.connected) {
     sendFrame(IPS3608Protocol.setOutput(newState));
   }
 }
@@ -540,32 +601,23 @@ async function resetCapacityCounter() {
   state.energyWh = 0.00;
   updateTelemetryDisplays();
 
-  if (state.connected && !state.simMode) {
-    // CMD_11: F1 B1 D8 01 00 D9 (Zero capacity accumulator)
+  if (state.connected) {
     await sendFrame(IPS3608Protocol.resetCapacity());
     setTimeout(async () => {
-      // Re-enable accumulator (CMD_10)
       await sendFrame(IPS3608Protocol.startCapacity());
     }, 150);
   }
 }
 
 async function triggerBootloader() {
-  const confirmed = confirm(
-    'Möchten Sie das Netzteil wirklich in den Firmware-Bootloader-Modus (IAP) versetzen?\n\n' +
-    'Das Gerät startet im IAP-Modus neu, um Firmware über das FNIRSI-Tool oder USB zu flashen.\n' +
-    'Die serielle Verbindung wird dabei getrennt.'
-  );
+  const confirmed = confirm(t('dialog.bootloader_confirm'));
   if (!confirmed) return;
 
-  if (state.connected && !state.simMode) {
+  if (state.connected) {
     await sendFrame(IPS3608Protocol.enterBootloader());
     setTimeout(() => {
       disconnectSerial();
     }, 300);
-  } else if (state.simMode) {
-    alert('Simulation: Bootloader-Befehl (CMD_15: F1 C0 00 01 01 02) gesendet.');
-    disconnectSerial();
   }
 }
 
@@ -585,7 +637,7 @@ function openProtectionModal() {
   }
   elements.modalProtectionSettings.classList.remove('hidden');
 
-  if (state.connected && !state.simMode) {
+  if (state.connected) {
     sendFrame(IPS3608Protocol.queryAll());
   }
 }
@@ -595,13 +647,13 @@ function closeProtectionModal() {
 }
 
 async function refreshProtectionLimits() {
-  if (state.connected && !state.simMode) {
+  if (state.connected) {
     await sendFrame(IPS3608Protocol.queryAll());
   }
   updateProtectionModalInputs();
   if (elements.protectionSaveFeedback) {
     elements.protectionSaveFeedback.className = 'save-feedback success';
-    elements.protectionSaveFeedback.textContent = '✓ Schwellenwerte aus dem Gerät aktualisiert!';
+    elements.protectionSaveFeedback.textContent = t('modal.refreshed_msg');
     setTimeout(() => {
       if (elements.protectionSaveFeedback) elements.protectionSaveFeedback.className = 'save-feedback hidden';
     }, 2500);
@@ -617,8 +669,7 @@ async function saveProtectionLimits() {
 
   state.protectionLimits = { ovp, ocp, opp, otp, lvp };
 
-  if (state.connected && !state.simMode) {
-    // Send frames with small pause to ensure device EEPROM write cycle
+  if (state.connected) {
     await sendFrame(IPS3608Protocol.setOvpLimit(ovp));
     await new Promise(r => setTimeout(r, 40));
     await sendFrame(IPS3608Protocol.setOcpLimit(ocp));
@@ -632,7 +683,7 @@ async function saveProtectionLimits() {
 
   if (elements.protectionSaveFeedback) {
     elements.protectionSaveFeedback.className = 'save-feedback success';
-    elements.protectionSaveFeedback.textContent = '✓ Schutzgrenzen erfolgreich im Gerät gespeichert!';
+    elements.protectionSaveFeedback.textContent = t('modal.saved_msg');
     setTimeout(() => {
       if (elements.protectionSaveFeedback) elements.protectionSaveFeedback.className = 'save-feedback hidden';
     }, 3000);
@@ -651,13 +702,11 @@ function recordHistoryPoint() {
     a: state.actualCurrent
   });
 
-  // Prune history older than timebaseSeconds
   const cutoff = now - (state.timebaseSeconds * 1000);
   while (state.history.length > 0 && state.history[0].time < cutoff) {
     state.history.shift();
   }
 
-  // Data Logger
   if (state.logging) {
     state.logData.push({
       timestamp: new Date().toISOString(),
@@ -666,7 +715,7 @@ function recordHistoryPoint() {
       power: state.actualPower.toFixed(2),
       mode: state.mode
     });
-    elements.logCounter.textContent = `${state.logData.length} Messpunkte`;
+    elements.logCounter.textContent = t('scope.log_count', { count: state.logData.length });
   }
 }
 
@@ -677,11 +726,9 @@ function drawScope() {
   const w = canvas.width;
   const h = canvas.height;
 
-  // Clear
   ctx.fillStyle = '#04070d';
   ctx.fillRect(0, 0, w, h);
 
-  // Draw Grid Lines
   ctx.strokeStyle = 'rgba(0, 215, 255, 0.08)';
   ctx.lineWidth = 1;
 
@@ -709,10 +756,10 @@ function drawScope() {
 
   const now = Date.now();
   const startTime = now - (state.timebaseSeconds * 1000);
-  const maxV = Math.max(10, Math.ceil(state.targetVoltage * 1.2)); // Dynamic scaling
+  const maxV = Math.max(10, Math.ceil(state.targetVoltage * 1.2));
   const maxA = Math.max(2, Math.ceil(state.targetCurrent * 1.2));
 
-  // 1. Draw Voltage Trace (Cyan)
+  // Voltage Trace (Cyan)
   ctx.strokeStyle = '#00f0ff';
   ctx.lineWidth = 2;
   ctx.shadowColor = '#00f0ff';
@@ -728,7 +775,7 @@ function drawScope() {
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // 2. Draw Current Trace (Emerald Green)
+  // Current Trace (Emerald Green)
   ctx.strokeStyle = '#00ff88';
   ctx.lineWidth = 2;
   ctx.shadowColor = '#00ff88';
@@ -756,10 +803,40 @@ function resizeCanvas() {
 }
 
 // ==========================================================================
-// Event Listeners & Initialization
+// i18n Refresh & Event Listeners
 // ==========================================================================
 
+function refreshDynamicTexts() {
+  updateConnectionUI(state.connected);
+  updateOutputState(state.outputOn);
+  updateTelemetryDisplays();
+  elements.btnRecordText.textContent = state.logging ? t('scope.rec_stop') : t('scope.rec_start');
+  elements.logCounter.textContent = state.logData.length > 0
+    ? t('scope.log_count', { count: state.logData.length })
+    : t('scope.log_count_init');
+  refreshPortList();
+}
+
+function initLanguage() {
+  document.documentElement.lang = translator.lang;
+  if (elements.selLanguage) {
+    elements.selLanguage.value = translator.lang;
+    elements.selLanguage.addEventListener('change', (e) => {
+      const lang = e.target.value;
+      translator.setLang(lang);
+      localStorage.setItem('language', translator.lang);
+      document.documentElement.lang = translator.lang;
+      I18nCore.applyTranslations(document, t);
+      refreshDynamicTexts();
+    });
+  }
+  I18nCore.applyTranslations(document, t);
+}
+
 function initEvents() {
+  initLanguage();
+  refreshDynamicTexts();
+
   window.addEventListener('resize', () => {
     resizeCanvas();
   });
@@ -767,14 +844,28 @@ function initEvents() {
   requestAnimationFrame(drawScope);
 
   // Connection
-  elements.btnConnect.addEventListener('click', connectSerial);
-  elements.btnRefreshPorts.addEventListener('click', refreshPortList);
-  elements.simModeCheckbox.addEventListener('change', (e) => {
-    state.simMode = e.target.checked;
-    if (!state.simMode && state.connected && state.simTimer) {
-      disconnectSerial();
+  elements.btnConnect.addEventListener('click', () => connectSerial(false));
+  elements.btnRefreshPorts.addEventListener('click', () => {
+    refreshPortList();
+    if (!state.connected) {
+      state.manualDisconnect = false;
+      autoScanAndConnect();
     }
   });
+
+  // Web Serial Hotplug Events (Plug & Play)
+  if (navigator.serial) {
+    navigator.serial.addEventListener('connect', () => {
+      state.manualDisconnect = false;
+      setTimeout(autoScanAndConnect, 350);
+    });
+    navigator.serial.addEventListener('disconnect', () => {
+      if (state.connected) {
+        disconnectSerial();
+      }
+      refreshPortList();
+    });
+  }
 
   // Master Power
   elements.btnMasterPower.addEventListener('click', toggleMasterOutput);
@@ -815,11 +906,11 @@ function initEvents() {
     state.logging = !state.logging;
     if (state.logging) {
       elements.btnToggleLog.classList.add('btn-recording-active');
-      elements.btnRecordText.textContent = 'Aufnahme stoppen';
+      elements.btnRecordText.textContent = t('scope.rec_stop');
       elements.btnExportCsv.disabled = false;
     } else {
       elements.btnToggleLog.classList.remove('btn-recording-active');
-      elements.btnRecordText.textContent = 'Aufnahme starten';
+      elements.btnRecordText.textContent = t('scope.rec_start');
     }
   });
 
@@ -829,7 +920,6 @@ function initEvents() {
   if (elements.btnResetCapacity) {
     elements.btnResetCapacity.addEventListener('click', resetCapacityCounter);
   }
-
   if (elements.btnBootloader) {
     elements.btnBootloader.addEventListener('click', triggerBootloader);
   }
@@ -855,39 +945,13 @@ function initEvents() {
     });
   }
 
-  // Interactive Protection Flags (Demo/Simulation mode: click to toggle any protection alert)
-  [
-    { el: elements.flagOvp, key: 'ovp', code: 1 },
-    { el: elements.flagOcp, key: 'ocp', code: 2 },
-    { el: elements.flagOpp, key: 'opp', code: 3 },
-    { el: elements.flagOtp, key: 'otp', code: 4 },
-    { el: elements.flagScp, key: 'scp', code: 5 }
-  ].forEach(({ el, key, code }) => {
-    if (el) {
-      el.style.cursor = 'pointer';
-      el.title = 'Im Demo-Modus anklickbar für Simulation';
-      el.addEventListener('click', () => {
-        if (state.simMode) {
-          const active = !state.protection[key];
-          state.protection[key] = active;
-          if (key === 'scp') state.protection.lvp = active;
-          state.protection.code = active ? code : 0;
-          if (active) {
-            updateOutputState(false);
-            if (key === 'scp') {
-              state.actualVoltage = 0.00;
-              state.actualCurrent = 0.00;
-              state.actualPower = 0.00;
-            }
-          }
-          updateTelemetryDisplays();
-        }
-      });
+  // Initial port scan & automatic connection, plus periodic background scan when disconnected
+  autoScanAndConnect();
+  setInterval(() => {
+    if (!state.connected && !state.connecting && !state.manualDisconnect) {
+      autoScanAndConnect();
     }
-  });
-
-  // Initial port refresh
-  refreshPortList();
+  }, 2500);
 }
 
 function exportCsv() {
