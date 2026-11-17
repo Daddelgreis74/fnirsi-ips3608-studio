@@ -2,7 +2,7 @@
 (function (root, factory) {
   const api = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else root.I18nCore = api;
+  if (root) root.I18nCore = api;
 })(typeof self !== 'undefined' ? self : this, function () {
   const SOURCE_LANG = 'de';
   const FALLBACK_LANG = 'en';

@@ -1,6 +1,6 @@
 (function (root, data) {
   if (typeof module !== 'undefined' && module.exports) module.exports = data;
-  else (root.I18nLocales = root.I18nLocales || {}).de = data;
+  if (root) (root.I18nLocales = root.I18nLocales || {}).de = data;
 })(typeof self !== 'undefined' ? self : this, {
   "header.device_info_title": "Hardware-Informationen (Modell, Firmware, Seriennummer)",
   "header.fw_unknown": "FW: --",
