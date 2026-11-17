@@ -271,6 +271,7 @@ body {
 }
 
 .badge {
+  white-space: nowrap;
   font-size: 0.7rem;
   font-weight: 700;
   padding: 3px 8px;
@@ -1152,4 +1153,97 @@ input:checked + .slider.round:before { transform: translateX(14px); }
 .lang-select:hover,
 .lang-select:focus {
   border-color: var(--color-cyan);
+}
+
+.btn-tool-active {
+  border-color: rgba(255, 170, 0, 0.5);
+  color: var(--color-amber);
+  background: rgba(255, 170, 0, 0.14);
+}
+
+/* GitHub Auto-Updater Chip */
+.btn-update-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-left: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.btn-update-chip:hover {
+  border-color: var(--color-cyan);
+  color: var(--color-cyan);
+  background: rgba(0, 240, 255, 0.12);
+}
+
+.btn-update-chip.btn-update-available {
+  background: rgba(0, 255, 136, 0.18);
+  border-color: rgba(0, 255, 136, 0.6);
+  color: var(--color-green);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+  animation: pulse-border 2s infinite ease-in-out;
+}
+
+/* USB Status LED Pill */
+.usb-led-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(18, 28, 48, 0.85);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.usb-led-pill:hover {
+  border-color: var(--color-cyan);
+}
+
+.usb-led-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transition: all 0.25s ease;
+}
+
+.usb-led-searching {
+  border-color: rgba(255, 170, 0, 0.35);
+  color: var(--color-amber);
+}
+.usb-led-searching .usb-led-dot {
+  background: var(--color-amber);
+  box-shadow: 0 0 8px var(--color-amber);
+  animation: blink-alert 1.2s infinite alternate;
+}
+
+.usb-led-connecting {
+  border-color: rgba(0, 240, 255, 0.45);
+  color: var(--color-cyan);
+}
+.usb-led-connecting .usb-led-dot {
+  background: var(--color-cyan);
+  box-shadow: 0 0 10px var(--color-cyan);
+  animation: blink-alert 0.5s infinite alternate;
+}
+
+.usb-led-connected {
+  border-color: rgba(0, 255, 136, 0.5);
+  background: rgba(0, 255, 136, 0.1);
+  color: var(--color-green);
+}
+.usb-led-connected .usb-led-dot {
+  background: var(--color-green);
+  box-shadow: 0 0 10px var(--color-green);
 }

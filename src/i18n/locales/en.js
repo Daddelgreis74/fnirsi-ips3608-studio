@@ -13,6 +13,12 @@
   "header.port_add": "➕ Select new COM port...",
   "header.port_device": "Device #{idx}",
   "header.rescan_title": "Rescan COM ports",
+  "header.usb_searching": "Searching USB device... (Click to rescan)",
+  "header.usb_connecting": "Connecting to {port}...",
+  "header.usb_connected": "USB connected: {port}",
+  "header.keylock_title": "Switch between PC Control (front panel locked) and Monitor Mode (front panel unlocked)",
+  "header.keylock_locked": "🖥️ PC Control (🔒)",
+  "header.keylock_unlocked": "🎛️ Device Free (Monitor)",
   "header.limits_btn": "⚙️ Safety Limits",
   "header.limits_title": "Configure hardware protection limits in EEPROM (OVP, OCP, OPP, OTP, LVP)",
   "header.bootloader_btn": "⚡ Bootloader",
@@ -85,5 +91,14 @@
   "modal.saved_msg": "✓ Protection limits successfully saved to device!",
 
   "dialog.connect_error": "Connection error: {message}",
-  "dialog.bootloader_confirm": "Do you really want to reboot the power supply into Firmware Bootloader mode (IAP)?\n\nThe device will restart in IAP mode for flashing via FNIRSI tool or USB.\nThe serial connection will be closed."
+  "dialog.bootloader_confirm": "Do you really want to reboot the power supply into Firmware Bootloader mode (IAP)?\n\nThe device will restart in IAP mode for flashing via FNIRSI tool or USB.\nThe serial connection will be closed.",
+
+  "updater.check": "🔄 Update",
+  "updater.check_title": "Check GitHub for a newer version",
+  "updater.checking": "⏳ Checking...",
+  "updater.up_to_date": "✓ Up to date (v{version})",
+  "updater.available": "⬆ Update v{version}",
+  "updater.downloading": "⬇ {pct}%",
+  "updater.confirm": "New version v{version} is available on GitHub!\n\nDownload, install and restart the app now?",
+  "updater.error": "Update error: {message}"
 });

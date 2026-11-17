@@ -19,6 +19,7 @@ const state = {
   connected: false,
   connecting: false,
   manualDisconnect: false,
+  keyLocked: localStorage.getItem('pcControlMode') !== 'false',
   detectedPortName: null,
   outputOn: false,
   targetVoltage: 12.00,
@@ -73,25 +74,31 @@ const state = {
     model: 'IPS3608',
     firmware: '',
     serial: ''
-  }
+  },
+
+  // GitHub Updater
+  updateInfo: null,
+  updating: false
 };
 
 // UI Element References
 const elements = {
   selLanguage: document.getElementById('selLanguage'),
+  btnCheckUpdate: document.getElementById('btnCheckUpdate'),
+  btnCheckUpdateText: document.getElementById('btnCheckUpdateText'),
 
   // Device Info Chip
   deviceInfoChip: document.getElementById('deviceInfoChip'),
   chipModelText: document.getElementById('chipModelText'),
   chipFwText: document.getElementById('chipFwText'),
   chipSnText: document.getElementById('chipSnText'),
+  btnKeyLock: document.getElementById('btnKeyLock'),
+  btnKeyLockText: document.getElementById('btnKeyLockText'),
   btnOpenProtectionModal: document.getElementById('btnOpenProtectionModal'),
   btnBootloader: document.getElementById('btnBootloader'),
 
-  btnConnect: document.getElementById('btnConnect'),
-  btnConnectText: document.getElementById('btnConnectText'),
-  comPortSelect: document.getElementById('comPortSelect'),
-  btnRefreshPorts: document.getElementById('btnRefreshPorts'),
+  usbStatusPill: document.getElementById('usbStatusPill'),
+  usbStatusLabel: document.getElementById('usbStatusLabel'),
 
   outputPill: document.getElementById('outputPill'),
   outputPillText: document.getElementById('outputPillText'),
@@ -145,13 +152,13 @@ const elements = {
 };
 
 // ==========================================================================
-// Serial Communication & Auto-Detection Engine
+// Serial Communication & Auto-Detection Engine (Native .NET SerialPort Bridge)
 // ==========================================================================
 
 async function scanSystemComPorts() {
   if (!ipcRenderer) return [];
   try {
-    const ports = await ipcRenderer.invoke('serial:scan-pnp-ports');
+    const ports = await ipcRenderer.invoke('serial:scan-ports');
     state.pnpPorts = Array.isArray(ports) ? ports : [];
     return state.pnpPorts;
   } catch (err) {
@@ -160,234 +167,216 @@ async function scanSystemComPorts() {
   }
 }
 
+function updateUsbLedUI(statusMode, portName = null) {
+  if (!elements.usbStatusPill || !elements.usbStatusLabel) return;
+  elements.usbStatusPill.classList.remove('usb-led-searching', 'usb-led-connecting', 'usb-led-connected');
+
+  if (statusMode === 'connected') {
+    elements.usbStatusPill.classList.add('usb-led-connected');
+    elements.usbStatusLabel.textContent = portName || 'USB';
+    elements.usbStatusPill.title = t('header.usb_connected', { port: portName || 'USB' });
+  } else if (statusMode === 'connecting') {
+    elements.usbStatusPill.classList.add('usb-led-connecting');
+    elements.usbStatusLabel.textContent = portName || 'USB';
+    elements.usbStatusPill.title = t('header.usb_connecting', { port: portName || 'USB' });
+  } else {
+    elements.usbStatusPill.classList.add('usb-led-searching');
+    elements.usbStatusLabel.textContent = portName || 'USB';
+    elements.usbStatusPill.title = t('header.usb_searching');
+  }
+}
+
 async function refreshPortList() {
-  if (!navigator.serial) return;
   try {
-    const [webPorts, pnpPorts] = await Promise.all([
-      navigator.serial.getPorts(),
-      scanSystemComPorts()
-    ]);
-
-    const prevValue = elements.comPortSelect.value;
-    elements.comPortSelect.innerHTML = '';
-
-    const optAuto = document.createElement('option');
-    optAuto.value = 'auto';
-    optAuto.textContent = pnpPorts.length > 0
-      ? `⚡ ${t('header.port_auto')} (${pnpPorts[0].comPort})`
-      : t('header.port_placeholder');
-    elements.comPortSelect.appendChild(optAuto);
-
-    // Show detected PnP COM ports with descriptive names
-    pnpPorts.forEach((p) => {
-      const opt = document.createElement('option');
-      opt.value = `pnp:${p.comPort}`;
-      const vidTag = p.vid ? ` [VID:${p.vid.toUpperCase()}]` : '';
-      opt.textContent = `${p.comPort} – ${p.name}${vidTag}`;
-      elements.comPortSelect.appendChild(opt);
-    });
-
-    // Also include already-granted Web Serial ports if no PnP entries exist
-    if (pnpPorts.length === 0) {
-      webPorts.forEach((p, idx) => {
-        const info = p.getInfo();
-        const usbVendor = info.usbVendorId ? `(VID: 0x${info.usbVendorId.toString(16)})` : '';
-        const opt = document.createElement('option');
-        opt.value = `web:${idx}`;
-        opt.textContent = `${t('header.port_device', { idx: idx + 1 })} ${usbVendor}`;
-        elements.comPortSelect.appendChild(opt);
-      });
-    }
-
-    const optRequest = document.createElement('option');
-    optRequest.value = 'request';
-    optRequest.textContent = t('header.port_add');
-    elements.comPortSelect.appendChild(optRequest);
-
-    if (prevValue && Array.from(elements.comPortSelect.options).some(o => o.value === prevValue)) {
-      elements.comPortSelect.value = prevValue;
+    const pnpPorts = await scanSystemComPorts();
+    if (state.connected) {
+      updateUsbLedUI('connected', state.detectedPortName);
+    } else if (state.connecting) {
+      updateUsbLedUI('connecting', state.detectedPortName);
     } else {
-      elements.comPortSelect.value = 'auto';
+      const best = pnpPorts.find(p => p.isFnirsi) || pnpPorts.find(p => p.isKnownUsb || p.isUsb);
+      updateUsbLedUI('searching', best ? best.comPort : 'USB');
     }
   } catch (err) {
     console.error('Error fetching ports:', err);
   }
 }
 
+let connectTimeoutTimer = null;
+
 async function autoScanAndConnect() {
-  if (state.connected || state.connecting || state.manualDisconnect) return;
-  if (!navigator.serial) return;
+  if (state.connected || state.connecting || state.manualDisconnect || !ipcRenderer) return;
 
   try {
     const pnpPorts = await scanSystemComPorts();
-    const webPorts = await navigator.serial.getPorts();
-
-    // Prioritize USB serial ports detected by Windows PnP, or previously granted Web Serial ports
-    const usbPort = pnpPorts.find(p => p.isKnownUsb || p.isUsb);
-    if (usbPort) {
-      await refreshPortList();
-      if (ipcRenderer) {
-        await ipcRenderer.invoke('serial:set-preferred-port', usbPort.comPort);
-      }
-      state.detectedPortName = usbPort.comPort;
-      await connectSerial(true);
-    } else if (webPorts.length > 0) {
-      await refreshPortList();
-      await connectSerial(true);
+    const fnirsiOrUsb = pnpPorts.find(p => p.isFnirsi) || pnpPorts.find(p => p.isKnownUsb || p.isUsb);
+    if (fnirsiOrUsb) {
+      await connectSerial(true, fnirsiOrUsb.comPort);
+    } else {
+      updateUsbLedUI('searching', 'USB');
     }
   } catch (err) {
     console.debug('Auto-scan pass:', err.message);
   }
 }
 
-async function connectSerial(silent = false) {
+async function connectSerial(silent = false, explicitPort = null) {
   if (state.connected) {
     state.manualDisconnect = true;
     await disconnectSerial();
     return;
   }
 
-  if (state.connecting) return;
+  if (state.connecting || !ipcRenderer) return;
   state.connecting = true;
   state.manualDisconnect = false;
+  state.silentConnect = silent;
+
+  if (connectTimeoutTimer) clearTimeout(connectTimeoutTimer);
+  connectTimeoutTimer = setTimeout(() => {
+    if (state.connecting && !state.connected) {
+      console.warn('Serial connect timed out, resetting state');
+      state.connecting = false;
+      ipcRenderer.invoke('serial:disconnect').catch(() => {});
+      updateConnectionUI(false);
+    }
+  }, 7000);
 
   try {
-    let port = null;
-    const selectedVal = elements.comPortSelect.value;
-    const availablePorts = await navigator.serial.getPorts();
-
-    if (selectedVal.startsWith('pnp:') && ipcRenderer) {
-      const comName = selectedVal.slice(4);
-      state.detectedPortName = comName;
-      await ipcRenderer.invoke('serial:set-preferred-port', comName);
-      port = await navigator.serial.requestPort();
-    } else if (selectedVal === 'request') {
-      if (ipcRenderer) await ipcRenderer.invoke('serial:set-preferred-port', null);
-      port = await navigator.serial.requestPort();
-    } else if (selectedVal.startsWith('web:')) {
-      const idx = parseInt(selectedVal.slice(4), 10);
-      port = availablePorts[idx] || await navigator.serial.requestPort();
-    } else {
-      // Auto mode: prefer matching PnP USB port if detected, else first available Web Serial port
-      if (state.pnpPorts.length > 0 && ipcRenderer) {
-        const best = state.pnpPorts.find(p => p.isKnownUsb || p.isUsb) || state.pnpPorts[0];
-        state.detectedPortName = best.comPort;
-        await ipcRenderer.invoke('serial:set-preferred-port', best.comPort);
-        port = await navigator.serial.requestPort();
-      } else if (availablePorts.length > 0) {
-        port = availablePorts[0];
-      } else if (!silent) {
-        port = await navigator.serial.requestPort();
-      }
+    let targetPort = explicitPort;
+    if (!targetPort) {
+      const ports = state.pnpPorts.length > 0 ? state.pnpPorts : await scanSystemComPorts();
+      const best = ports.find(p => p.isFnirsi) || ports.find(p => p.isKnownUsb || p.isUsb) || ports[0];
+      targetPort = best ? best.comPort : null;
     }
 
-    if (!port) {
+    if (!targetPort) {
+      if (connectTimeoutTimer) clearTimeout(connectTimeoutTimer);
       state.connecting = false;
+      updateUsbLedUI('searching', 'USB');
+      if (!silent) {
+        alert(t('dialog.connect_error', { message: t('header.port_placeholder') }));
+      }
       return;
     }
 
-    await port.open({ baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none' });
-    state.port = port;
-    state.writer = port.writable.getWriter();
-    state.connected = true;
-    state.keepReading = true;
-
-    updateConnectionUI(true);
-
-    // Send connect handshake
-    await sendFrame(IPS3608Protocol.connectPacket());
-    await new Promise(r => setTimeout(r, 60));
-
-    // Device initialization sync (CMD_13) required before querying Model, Firmware and Serial
-    await sendFrame(IPS3608Protocol.initHandshake());
-    await new Promise(r => setTimeout(r, 60));
-
-    // Query hardware metadata (Model, Firmware version, Serial Number)
-    await sendFrame(IPS3608Protocol.queryModel());
-    await new Promise(r => setTimeout(r, 60));
-    await sendFrame(IPS3608Protocol.queryFirmware());
-    await new Promise(r => setTimeout(r, 60));
-    await sendFrame(IPS3608Protocol.querySerial());
-    await new Promise(r => setTimeout(r, 60));
-
-    // Ensure capacity accumulator is active on device
-    await sendFrame(IPS3608Protocol.startCapacity());
-
-    // Start reading loop
-    readLoop();
-
-    // Start polling loop
-    startPolling();
+    state.detectedPortName = targetPort;
+    updateUsbLedUI('connecting', targetPort);
+    state.readBuffer = new Uint8Array(0);
+    await ipcRenderer.invoke('serial:connect', targetPort);
   } catch (err) {
+    if (connectTimeoutTimer) clearTimeout(connectTimeoutTimer);
     console.error('Serial connection failed:', err);
     if (!silent) {
       alert(t('dialog.connect_error', { message: err.message }));
     }
-    updateConnectionUI(false);
-  } finally {
     state.connecting = false;
+    updateConnectionUI(false);
+  }
+}
+
+async function onSerialConnected(portName) {
+  if (connectTimeoutTimer) {
+    clearTimeout(connectTimeoutTimer);
+    connectTimeoutTimer = null;
+  }
+  state.connecting = false;
+  state.connected = true;
+  state.lastRxTime = Date.now();
+  state.detectedPortName = portName;
+  clearTxQueues();
+  updateConnectionUI(true);
+
+  // Let USB-CDC settle, then pace handshake & metadata queries cleanly (80ms spacing)
+  await new Promise(r => setTimeout(r, 150));
+  if (!state.connected) return;
+
+  sendFrame(IPS3608Protocol.connectPacket(), true);
+  await new Promise(r => setTimeout(r, 80));
+  if (!state.connected) return;
+  sendFrame(IPS3608Protocol.initHandshake(), true);
+  await new Promise(r => setTimeout(r, 80));
+  if (!state.connected) return;
+  sendFrame(IPS3608Protocol.queryModel(), true);
+  await new Promise(r => setTimeout(r, 80));
+  if (!state.connected) return;
+  sendFrame(IPS3608Protocol.queryFirmware(), true);
+  await new Promise(r => setTimeout(r, 80));
+  if (!state.connected) return;
+  sendFrame(IPS3608Protocol.querySerial(), true);
+  await new Promise(r => setTimeout(r, 80));
+  if (!state.connected) return;
+
+  // Keep front-panel knob & buttons unlocked unless user explicitly locked them
+  if (!state.keyLocked) {
+    sendFrame(IPS3608Protocol.disconnectPacket(), true);
+    await new Promise(r => setTimeout(r, 80));
+    if (!state.connected) return;
+  }
+
+  startPolling();
+}
+
+function updateKeyLockUI() {
+  if (!elements.btnKeyLock || !elements.btnKeyLockText) return;
+  elements.btnKeyLock.classList.toggle('btn-tool-active', state.keyLocked);
+  elements.btnKeyLockText.textContent = state.keyLocked
+    ? t('header.keylock_locked')
+    : t('header.keylock_unlocked');
+}
+
+function toggleKeyLock() {
+  state.keyLocked = !state.keyLocked;
+  localStorage.setItem('pcControlMode', state.keyLocked ? 'true' : 'false');
+  updateKeyLockUI();
+
+  if (state.keyLocked) {
+    state.manualDisconnect = false;
+    state.lastRxTime = Date.now();
+    if (state.connected) {
+      sendFrame(IPS3608Protocol.connectPacket(), true);
+      sendFrame(IPS3608Protocol.initHandshake(), true);
+      sendFrame(IPS3608Protocol.queryAll(), true);
+    } else {
+      autoScanAndConnect();
+    }
+  } else if (state.connected) {
+    sendFrame(IPS3608Protocol.disconnectPacket(), true);
   }
 }
 
 async function disconnectSerial() {
-  state.keepReading = false;
-  state.connected = false;
-
+  if (connectTimeoutTimer) {
+    clearTimeout(connectTimeoutTimer);
+    connectTimeoutTimer = null;
+  }
   if (pollTimer) {
-    clearInterval(pollTimer);
+    clearTimeout(pollTimer);
     pollTimer = null;
   }
+  clearTxQueues();
 
-  try {
-    if (state.reader) {
-      await state.reader.cancel();
-      state.reader.releaseLock();
-      state.reader = null;
-    }
-    if (state.writer) {
-      await state.writer.close();
-      state.writer.releaseLock();
-      state.writer = null;
-    }
-    if (state.port) {
-      await state.port.close();
-      state.port = null;
-    }
-  } catch (e) {
-    console.warn('Error during disconnect:', e);
+  // Send official disconnect/unlock packet (CMD_2: F1 C1 00 01 00 01) directly before closing
+  if (state.connected && ipcRenderer) {
+    try {
+      ipcRenderer.send('serial:send', Array.from(IPS3608Protocol.disconnectPacket()));
+      await new Promise(r => setTimeout(r, 60));
+    } catch (e) {}
+  }
+
+  state.connected = false;
+  state.connecting = false;
+
+  if (ipcRenderer) {
+    try {
+      await ipcRenderer.invoke('serial:disconnect');
+    } catch (e) {}
   }
 
   updateConnectionUI(false);
   state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false, lvp: false };
   state.deviceInfo = { model: 'IPS3608', firmware: '', serial: '' };
   updateTelemetryDisplays();
-}
-
-async function readLoop() {
-  while (state.port && state.port.readable && state.keepReading) {
-    try {
-      state.reader = state.port.readable.getReader();
-      while (true) {
-        const { value, done } = await state.reader.read();
-        if (done) break;
-        if (value) {
-          handleIncomingBytes(value);
-        }
-      }
-    } catch (err) {
-      console.warn('Read error / disconnect detected:', err);
-      break;
-    } finally {
-      if (state.reader) {
-        state.reader.releaseLock();
-        state.reader = null;
-      }
-    }
-  }
-
-  if (state.connected) {
-    disconnectSerial();
-  }
 }
 
 function handleIncomingBytes(chunk) {
@@ -399,46 +388,86 @@ function handleIncomingBytes(chunk) {
   const { frames, remainingBuffer } = IPS3608Protocol.parseStream(state.readBuffer);
   state.readBuffer = remainingBuffer;
 
+  if (frames.length > 0) {
+    state.lastRxTime = Date.now();
+  }
+
   for (const frame of frames) {
     const data = IPS3608Protocol.decodeTelemetry(frame);
     applyTelemetry(data);
   }
 }
 
-async function sendFrame(frameBytes) {
-  if (state.writer) {
-    try {
-      await state.writer.write(frameBytes);
-    } catch (err) {
-      console.error('Send frame failed:', err);
+// Serialized FIFO TX Queues (priority commands ahead of background polls, preserving exact order)
+let priorityQueue = [];
+let pollQueue = [];
+let txDraining = false;
+
+function clearTxQueues() {
+  priorityQueue = [];
+  pollQueue = [];
+}
+
+function sendFrame(frameBytes, priority = true) {
+  if (!ipcRenderer || !state.connected) return;
+  if (!priority) {
+    if (priorityQueue.length > 0 || pollQueue.length > 0) return;
+    pollQueue.push(frameBytes);
+  } else {
+    priorityQueue.push(frameBytes);
+  }
+  drainTxQueue();
+}
+
+async function drainTxQueue() {
+  if (txDraining) return;
+  txDraining = true;
+  try {
+    while ((priorityQueue.length > 0 || pollQueue.length > 0) && state.connected && ipcRenderer) {
+      const next = priorityQueue.length > 0 ? priorityQueue.shift() : pollQueue.shift();
+      ipcRenderer.send('serial:send', Array.from(next));
+      await new Promise(r => setTimeout(r, 45));
     }
+  } finally {
+    txDraining = false;
+  }
+}
+
+function ensurePcControlMode() {
+  if (state.connected && !state.keyLocked) {
+    state.keyLocked = true;
+    state.lastRxTime = Date.now();
+    localStorage.setItem('pcControlMode', 'true');
+    updateKeyLockUI();
+    sendFrame(IPS3608Protocol.connectPacket(), true);
+    sendFrame(IPS3608Protocol.initHandshake(), true);
   }
 }
 
 let pollTimer = null;
-let pollTick = 0;
 function startPolling() {
-  if (pollTimer) clearInterval(pollTimer);
-  pollTick = 0;
-  pollTimer = setInterval(() => {
-    if (state.connected) {
-      pollTick++;
-      // Poll fast telemetry (10 Hz) interleaved with full status queries (5 Hz)
-      if (pollTick % 2 === 0) {
-        sendFrame(IPS3608Protocol.queryAll());
-      } else {
-        sendFrame(IPS3608Protocol.queryLiveValues());
-      }
+  if (pollTimer) clearTimeout(pollTimer);
 
-      // Re-query device info in first 10 seconds if not yet received
-      if (!state.deviceInfo.firmware && pollTick <= 100 && pollTick % 25 === 12) {
-        sendFrame(IPS3608Protocol.initHandshake());
-        setTimeout(() => sendFrame(IPS3608Protocol.queryModel()), 40);
-        setTimeout(() => sendFrame(IPS3608Protocol.queryFirmware()), 80);
-        setTimeout(() => sendFrame(IPS3608Protocol.querySerial()), 120);
-      }
+  async function pollCycle() {
+    if (!state.connected) return;
+
+    // Watchdog: only enforce 4.5s RX timeout while in active PC-Control mode
+    if (state.keyLocked && state.lastRxTime && (Date.now() - state.lastRxTime > 4500)) {
+      console.warn('RX Watchdog timeout: no telemetry for 4.5s, disconnecting');
+      await disconnectSerial();
+      return;
     }
-  }, 100); // 10 Hz refresh
+
+    if (state.keyLocked) {
+      sendFrame(IPS3608Protocol.queryAll(), false);
+    }
+
+    if (state.connected) {
+      pollTimer = setTimeout(pollCycle, 250);
+    }
+  }
+
+  pollCycle();
 }
 
 // ==========================================================================
@@ -454,6 +483,24 @@ function applyTelemetry(data) {
   if (data.mode !== undefined) state.mode = data.mode;
   if (data.capacityAh !== undefined) state.capacityAh = data.capacityAh;
   if (data.energyWh !== undefined) state.energyWh = data.energyWh;
+
+  // Sync setpoints from device if user is not actively editing sliders
+  if (!state.lastUserEditTime || (Date.now() - state.lastUserEditTime > 1500)) {
+    if (data.targetVoltage !== undefined && data.targetVoltage >= 0 && data.targetVoltage <= 36.0) {
+      state.targetVoltage = data.targetVoltage;
+      if (document.activeElement !== elements.inputTargetVoltage) {
+        elements.inputTargetVoltage.value = data.targetVoltage.toFixed(2);
+      }
+      elements.sliderVoltage.value = data.targetVoltage;
+    }
+    if (data.targetCurrent !== undefined && data.targetCurrent >= 0 && data.targetCurrent <= 8.2) {
+      state.targetCurrent = data.targetCurrent;
+      if (document.activeElement !== elements.inputTargetCurrent) {
+        elements.inputTargetCurrent.value = data.targetCurrent.toFixed(2);
+      }
+      elements.sliderCurrent.value = data.targetCurrent;
+    }
+  }
 
   // Device Info
   if (data.model !== undefined && data.model.length > 0) state.deviceInfo.model = data.model;
@@ -526,12 +573,9 @@ function updateTelemetryDisplays() {
 function updateConnectionUI(connected) {
   state.connected = connected;
   if (connected) {
-    elements.btnConnect.classList.replace('btn-connect', 'btn-disconnect');
-    const portTag = state.detectedPortName ? ` (${state.detectedPortName})` : '';
-    elements.btnConnectText.textContent = t('header.disconnect') + portTag;
+    updateUsbLedUI('connected', state.detectedPortName);
   } else {
-    elements.btnConnect.classList.replace('btn-disconnect', 'btn-connect');
-    elements.btnConnectText.textContent = t('header.connect');
+    updateUsbLedUI('searching', 'USB');
   }
 }
 
@@ -556,25 +600,52 @@ function updateOutputState(on) {
 // Setpoint Controls
 // ==========================================================================
 
-function setTargetVoltage(v) {
+let voltageTxTimer = null;
+let currentTxTimer = null;
+
+function setTargetVoltage(v, immediate = true) {
   const val = Math.max(0, Math.min(36.0, parseFloat(v) || 0));
   state.targetVoltage = val;
+  state.lastUserEditTime = Date.now();
   elements.inputTargetVoltage.value = val.toFixed(2);
   elements.sliderVoltage.value = val;
 
-  if (state.connected) {
-    sendFrame(IPS3608Protocol.setVoltage(val));
+  if (!state.connected) return;
+  if (immediate) {
+    if (voltageTxTimer) { clearTimeout(voltageTxTimer); voltageTxTimer = null; }
+    ensurePcControlMode();
+    sendFrame(IPS3608Protocol.setVoltage(val), true);
+  } else if (!voltageTxTimer) {
+    voltageTxTimer = setTimeout(() => {
+      voltageTxTimer = null;
+      if (state.connected) {
+        ensurePcControlMode();
+        sendFrame(IPS3608Protocol.setVoltage(state.targetVoltage), true);
+      }
+    }, 80);
   }
 }
 
-function setTargetCurrent(a) {
+function setTargetCurrent(a, immediate = true) {
   const val = Math.max(0, Math.min(8.2, parseFloat(a) || 0));
   state.targetCurrent = val;
+  state.lastUserEditTime = Date.now();
   elements.inputTargetCurrent.value = val.toFixed(2);
   elements.sliderCurrent.value = val;
 
-  if (state.connected) {
-    sendFrame(IPS3608Protocol.setCurrent(val));
+  if (!state.connected) return;
+  if (immediate) {
+    if (currentTxTimer) { clearTimeout(currentTxTimer); currentTxTimer = null; }
+    ensurePcControlMode();
+    sendFrame(IPS3608Protocol.setCurrent(val), true);
+  } else if (!currentTxTimer) {
+    currentTxTimer = setTimeout(() => {
+      currentTxTimer = null;
+      if (state.connected) {
+        ensurePcControlMode();
+        sendFrame(IPS3608Protocol.setCurrent(state.targetCurrent), true);
+      }
+    }, 80);
   }
 }
 
@@ -588,7 +659,8 @@ function toggleMasterOutput() {
   }
 
   if (state.connected) {
-    sendFrame(IPS3608Protocol.setOutput(newState));
+    ensurePcControlMode();
+    sendFrame(IPS3608Protocol.setOutput(newState), true);
   }
 }
 
@@ -602,9 +674,10 @@ async function resetCapacityCounter() {
   updateTelemetryDisplays();
 
   if (state.connected) {
-    await sendFrame(IPS3608Protocol.resetCapacity());
-    setTimeout(async () => {
-      await sendFrame(IPS3608Protocol.startCapacity());
+    ensurePcControlMode();
+    sendFrame(IPS3608Protocol.resetCapacity(), true);
+    setTimeout(() => {
+      if (state.connected) sendFrame(IPS3608Protocol.startCapacity(), true);
     }, 150);
   }
 }
@@ -670,15 +743,12 @@ async function saveProtectionLimits() {
   state.protectionLimits = { ovp, ocp, opp, otp, lvp };
 
   if (state.connected) {
-    await sendFrame(IPS3608Protocol.setOvpLimit(ovp));
-    await new Promise(r => setTimeout(r, 40));
-    await sendFrame(IPS3608Protocol.setOcpLimit(ocp));
-    await new Promise(r => setTimeout(r, 40));
-    await sendFrame(IPS3608Protocol.setOppLimit(opp));
-    await new Promise(r => setTimeout(r, 40));
-    await sendFrame(IPS3608Protocol.setOtpLimit(otp));
-    await new Promise(r => setTimeout(r, 40));
-    await sendFrame(IPS3608Protocol.setLvpLimit(lvp));
+    ensurePcControlMode();
+    sendFrame(IPS3608Protocol.setOvpLimit(ovp), true);
+    sendFrame(IPS3608Protocol.setOcpLimit(ocp), true);
+    sendFrame(IPS3608Protocol.setOppLimit(opp), true);
+    sendFrame(IPS3608Protocol.setOtpLimit(otp), true);
+    sendFrame(IPS3608Protocol.setLvpLimit(lvp), true);
   }
 
   if (elements.protectionSaveFeedback) {
@@ -806,8 +876,62 @@ function resizeCanvas() {
 // i18n Refresh & Event Listeners
 // ==========================================================================
 
+function updateUpdaterUI() {
+  if (!elements.btnCheckUpdate || !elements.btnCheckUpdateText) return;
+  if (state.updating) return;
+  if (state.updateInfo && state.updateInfo.available) {
+    elements.btnCheckUpdate.classList.add('btn-update-available');
+    elements.btnCheckUpdateText.textContent = t('updater.available', { version: state.updateInfo.latestVersion });
+  } else {
+    elements.btnCheckUpdate.classList.remove('btn-update-available');
+    elements.btnCheckUpdateText.textContent = t('updater.check');
+  }
+}
+
+async function handleUpdateButtonClick() {
+  if (!ipcRenderer || state.updating) return;
+
+  if (state.updateInfo && state.updateInfo.available && state.updateInfo.asset) {
+    const ok = confirm(t('updater.confirm', { version: state.updateInfo.latestVersion }));
+    if (!ok) return;
+    state.updating = true;
+    elements.btnCheckUpdateText.textContent = t('updater.downloading', { pct: 0 });
+    try {
+      await ipcRenderer.invoke('updater:install', state.updateInfo.asset);
+    } catch (err) {
+      state.updating = false;
+      updateUpdaterUI();
+      alert(t('updater.error', { message: err.message }));
+    }
+    return;
+  }
+
+  elements.btnCheckUpdateText.textContent = t('updater.checking');
+  try {
+    const info = await ipcRenderer.invoke('updater:check');
+    if (info && info.error) {
+      alert(t('updater.error', { message: info.error }));
+      updateUpdaterUI();
+      return;
+    }
+    state.updateInfo = info;
+    if (info && info.available) {
+      updateUpdaterUI();
+      handleUpdateButtonClick();
+    } else {
+      elements.btnCheckUpdateText.textContent = t('updater.up_to_date', { version: info ? info.currentVersion : '' });
+      setTimeout(updateUpdaterUI, 3000);
+    }
+  } catch (err) {
+    alert(t('updater.error', { message: err.message }));
+    updateUpdaterUI();
+  }
+}
+
 function refreshDynamicTexts() {
   updateConnectionUI(state.connected);
+  updateKeyLockUI();
+  updateUpdaterUI();
   updateOutputState(state.outputOn);
   updateTelemetryDisplays();
   elements.btnRecordText.textContent = state.logging ? t('scope.rec_stop') : t('scope.rec_start');
@@ -843,38 +967,73 @@ function initEvents() {
   resizeCanvas();
   requestAnimationFrame(drawScope);
 
-  // Connection
-  elements.btnConnect.addEventListener('click', () => connectSerial(false));
-  elements.btnRefreshPorts.addEventListener('click', () => {
-    refreshPortList();
-    if (!state.connected) {
-      state.manualDisconnect = false;
-      autoScanAndConnect();
-    }
-  });
-
-  // Web Serial Hotplug Events (Plug & Play)
-  if (navigator.serial) {
-    navigator.serial.addEventListener('connect', () => {
-      state.manualDisconnect = false;
-      setTimeout(autoScanAndConnect, 350);
-    });
-    navigator.serial.addEventListener('disconnect', () => {
-      if (state.connected) {
-        disconnectSerial();
-      }
+  // USB Status LED (auto-connects; click to rescan when disconnected)
+  if (elements.usbStatusPill) {
+    elements.usbStatusPill.addEventListener('click', () => {
       refreshPortList();
+      if (!state.connected) {
+        state.manualDisconnect = false;
+        autoScanAndConnect();
+      }
+    });
+  }
+
+  // Native Serial & Updater IPC Listeners
+  if (elements.btnCheckUpdate) {
+    elements.btnCheckUpdate.addEventListener('click', handleUpdateButtonClick);
+  }
+
+  if (ipcRenderer) {
+    ipcRenderer.on('updater:available', (event, info) => {
+      state.updateInfo = info;
+      updateUpdaterUI();
+    });
+
+    ipcRenderer.on('updater:progress', (event, pct) => {
+      if (elements.btnCheckUpdateText) {
+        elements.btnCheckUpdateText.textContent = t('updater.downloading', { pct });
+      }
+    });
+
+    ipcRenderer.on('serial:rx', (event, bytes) => {
+      handleIncomingBytes(new Uint8Array(bytes));
+    });
+
+    ipcRenderer.on('serial:status', (event, status) => {
+      if (status.connected) {
+        onSerialConnected(status.port);
+      } else {
+        state.connecting = false;
+        const wasConnected = state.connected;
+        state.connected = false;
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
+        updateConnectionUI(false);
+        if (status.error && !state.silentConnect) {
+          alert(t('dialog.connect_error', { message: status.error }));
+        }
+        if (wasConnected) {
+          state.protection = { code: 0, ovp: false, ocp: false, opp: false, otp: false, scp: false, lvp: false };
+          state.deviceInfo = { model: 'IPS3608', firmware: '', serial: '' };
+          updateTelemetryDisplays();
+          refreshPortList();
+        }
+      }
     });
   }
 
   // Master Power
   elements.btnMasterPower.addEventListener('click', toggleMasterOutput);
 
-  // Setpoint Sliders
-  elements.sliderVoltage.addEventListener('input', (e) => setTargetVoltage(e.target.value));
-  elements.inputTargetVoltage.addEventListener('change', (e) => setTargetVoltage(e.target.value));
-  elements.sliderCurrent.addEventListener('input', (e) => setTargetCurrent(e.target.value));
-  elements.inputTargetCurrent.addEventListener('change', (e) => setTargetCurrent(e.target.value));
+  // Setpoint Sliders (throttled on drag, immediate on release/input)
+  elements.sliderVoltage.addEventListener('input', (e) => setTargetVoltage(e.target.value, false));
+  elements.sliderVoltage.addEventListener('change', (e) => setTargetVoltage(e.target.value, true));
+  elements.inputTargetVoltage.addEventListener('change', (e) => setTargetVoltage(e.target.value, true));
+  elements.sliderCurrent.addEventListener('input', (e) => setTargetCurrent(e.target.value, false));
+  elements.sliderCurrent.addEventListener('change', (e) => setTargetCurrent(e.target.value, true));
+  elements.inputTargetCurrent.addEventListener('change', (e) => setTargetCurrent(e.target.value, true));
 
   // Stepper Buttons
   document.querySelectorAll('.step-btn').forEach(btn => {
@@ -917,6 +1076,9 @@ function initEvents() {
   elements.btnExportCsv.addEventListener('click', exportCsv);
 
   // Advanced Hardware Actions
+  if (elements.btnKeyLock) {
+    elements.btnKeyLock.addEventListener('click', toggleKeyLock);
+  }
   if (elements.btnResetCapacity) {
     elements.btnResetCapacity.addEventListener('click', resetCapacityCounter);
   }

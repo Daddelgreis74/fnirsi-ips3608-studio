@@ -13,6 +13,12 @@
   "header.port_add": "➕ Neuen COM-Port wählen...",
   "header.port_device": "Gerät #{idx}",
   "header.rescan_title": "COM-Ports neu scannen",
+  "header.usb_searching": "Suche USB-Gerät... (Klicken für neuen Scan)",
+  "header.usb_connecting": "Verbinde mit {port}...",
+  "header.usb_connected": "USB verbunden: {port}",
+  "header.keylock_title": "Zwischen PC-Steuerung (Gerät gesperrt) und Monitor-Modus (Drehrad am Gerät frei) umschalten",
+  "header.keylock_locked": "🖥️ PC-Steuerung (🔒)",
+  "header.keylock_unlocked": "🎛️ Gerät frei (Monitor)",
   "header.limits_btn": "⚙️ Schutzgrenzen",
   "header.limits_title": "Hardware-Schutzgrenzen im EEPROM einstellen (OVP, OCP, OPP, OTP, LVP)",
   "header.bootloader_btn": "⚡ Bootloader",
@@ -85,5 +91,14 @@
   "modal.saved_msg": "✓ Schutzgrenzen erfolgreich im Gerät gespeichert!",
 
   "dialog.connect_error": "Verbindungsfehler: {message}",
-  "dialog.bootloader_confirm": "Möchten Sie das Netzteil wirklich in den Firmware-Bootloader-Modus (IAP) versetzen?\n\nDas Gerät startet im IAP-Modus neu, um Firmware über das FNIRSI-Tool oder USB zu flashen.\nDie serielle Verbindung wird dabei getrennt."
+  "dialog.bootloader_confirm": "Möchten Sie das Netzteil wirklich in den Firmware-Bootloader-Modus (IAP) versetzen?\n\nDas Gerät startet im IAP-Modus neu, um Firmware über das FNIRSI-Tool oder USB zu flashen.\nDie serielle Verbindung wird dabei getrennt.",
+
+  "updater.check": "🔄 Update",
+  "updater.check_title": "Auf GitHub nach neuer Version suchen",
+  "updater.checking": "⏳ Prüfe...",
+  "updater.up_to_date": "✓ Aktuell (v{version})",
+  "updater.available": "⬆ Update v{version}",
+  "updater.downloading": "⬇ {pct}%",
+  "updater.confirm": "Neue Version v{version} auf GitHub verfügbar!\n\nJetzt herunterladen, installieren und App neu starten?",
+  "updater.error": "Update-Fehler: {message}"
 });

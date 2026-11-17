@@ -23,7 +23,10 @@
       </div>
       <div class="brand-text">
         <h1>FNIRSI IPS3608 <span>STUDIO</span></h1>
-        <span class="version-tag">PRO CONTROL v1.4.1</span>
+        <span class="version-tag">PRO CONTROL v1.5.0</span>
+        <button id="btnCheckUpdate" class="btn-update-chip" data-i18n-title="updater.check_title" title="Auf GitHub nach neuer Version suchen">
+          <span id="btnCheckUpdateText" data-i18n="updater.check">🔄 Update</span>
+        </button>
       </div>
       <div id="deviceInfoChip" class="device-info-chip" data-i18n-title="header.device_info_title" title="Hardware-Informationen (Modell, Firmware, Seriennummer)">
         <span class="chip-dot"></span>
@@ -51,12 +54,14 @@
         <option value="fr">Français</option>
       </select>
 
-      <div class="port-select-wrapper">
-        <select id="comPortSelect" class="port-select">
-          <option value="" data-i18n="header.port_placeholder">Suche USB-Port...</option>
-        </select>
-        <button id="btnRefreshPorts" class="icon-btn" data-i18n-title="header.rescan_title" title="COM-Ports neu scannen">🔄</button>
-      </div>
+      <button id="usbStatusPill" class="usb-led-pill usb-led-searching" data-i18n-title="header.usb_searching" title="Suche USB-Gerät...">
+        <span class="usb-led-dot"></span>
+        <span id="usbStatusLabel" class="usb-led-label">USB</span>
+      </button>
+
+      <button id="btnKeyLock" class="btn btn-tool" data-i18n-title="header.keylock_title" title="Gerätetasten & Drehrad am IPS3608 sperren oder freigeben (CMD_1 / CMD_2)">
+        <span id="btnKeyLockText" data-i18n="header.keylock_unlocked">🔓 Tasten frei</span>
+      </button>
 
       <button id="btnOpenProtectionModal" class="btn btn-tool" data-i18n-title="header.limits_title" title="Hardware-Schutzgrenzen im EEPROM einstellen (OVP, OCP, OPP, OTP, LVP)">
         <span data-i18n="header.limits_btn">⚙️ Schutzgrenzen</span>
@@ -64,11 +69,6 @@
 
       <button id="btnBootloader" class="btn btn-tool btn-tool-danger" data-i18n-title="header.bootloader_title" title="IPS3608 in Firmware-Bootloader versetzen (CMD_15)">
         <span data-i18n="header.bootloader_btn">⚡ Bootloader</span>
-      </button>
-
-      <button id="btnConnect" class="btn btn-connect">
-        <span class="btn-icon">⚡</span>
-        <span id="btnConnectText" data-i18n="header.connect">Verbinden</span>
       </button>
     </div>
   </header>

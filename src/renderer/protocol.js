@@ -126,10 +126,17 @@ class IPS3608Protocol {
   }
 
   /**
-   * Command: Connect / Handshake packet
+   * Command: Connect / Handshake packet (CMD_1: F1 C1 00 01 01 02)
    */
   static connectPacket() {
     return this.buildFrame(CmdType.CONNECT, 0x00, new Uint8Array([0x01]));
+  }
+
+  /**
+   * Command: Disconnect / Unlock Front Panel (CMD_2: F1 C1 00 01 00 01)
+   */
+  static disconnectPacket() {
+    return this.buildFrame(CmdType.CONNECT, 0x00, new Uint8Array([0x00]));
   }
 
   /**

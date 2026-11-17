@@ -13,6 +13,12 @@
   "header.port_add": "➕ Choisir un nouveau port COM...",
   "header.port_device": "Appareil #{idx}",
   "header.rescan_title": "Actualiser les ports COM",
+  "header.usb_searching": "Recherche d'appareil USB... (Cliquer pour actualiser)",
+  "header.usb_connecting": "Connexion à {port}...",
+  "header.usb_connected": "USB connecté : {port}",
+  "header.keylock_title": "Basculer entre Contrôle PC (façade verrouillée) et Mode Moniteur (molette libre)",
+  "header.keylock_locked": "🖥️ Contrôle PC (🔒)",
+  "header.keylock_unlocked": "🎛️ Appareil libre (Moniteur)",
   "header.limits_btn": "⚙️ Limites",
   "header.limits_title": "Configurer les seuils de protection EEPROM (OVP, OCP, OPP, OTP, LVP)",
   "header.bootloader_btn": "⚡ Bootloader",
@@ -85,5 +91,14 @@
   "modal.saved_msg": "✓ Limites enregistrées avec succès !",
 
   "dialog.connect_error": "Erreur de connexion : {message}",
-  "dialog.bootloader_confirm": "Voulez-vous vraiment redémarrer l'alimentation en mode Bootloader (IAP) ?\n\nL'appareil va redémarrer en mode flashage via l'outil FNIRSI ou USB.\nLa connexion série sera fermée."
+  "dialog.bootloader_confirm": "Voulez-vous vraiment redémarrer l'alimentation en mode Bootloader (IAP) ?\n\nL'appareil va redémarrer en mode flashage via l'outil FNIRSI ou USB.\nLa connexion série sera fermée.",
+
+  "updater.check": "🔄 Mise à jour",
+  "updater.check_title": "Rechercher une nouvelle version sur GitHub",
+  "updater.checking": "⏳ Vérif...",
+  "updater.up_to_date": "✓ À jour (v{version})",
+  "updater.available": "⬆ MàJ v{version}",
+  "updater.downloading": "⬇ {pct}%",
+  "updater.confirm": "Nouvelle version v{version} disponible sur GitHub !\n\nTélécharger, installer et redémarrer l'application maintenant ?",
+  "updater.error": "Erreur de mise à jour : {message}"
 });
