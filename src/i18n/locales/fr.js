@@ -83,6 +83,8 @@
   "modal.otp_hint": "Coupure à cette température du dissipateur",
   "modal.lvp_label": "LVP – Sous-tension / Court-circuit",
   "modal.lvp_hint": "Coupure en cas de chute de tension (0.00 V = désactivé)",
+  "modal.brightness_label": "🔆 Luminosité de l'écran (0xD6)",
+  "modal.brightness_hint": "Luminosité de l'écran IPS de l'alimentation (0–20)",
   "modal.refresh_btn": "🔄 Lire l'appareil",
   "modal.refresh_title": "Lire les limites actuelles depuis l'alimentation",
   "modal.save_btn": "💾 Enregistrer",

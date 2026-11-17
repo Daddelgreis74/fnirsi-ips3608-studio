@@ -83,6 +83,8 @@
   "modal.otp_hint": "Abschaltung bei Kühlkörpertemperatur",
   "modal.lvp_label": "LVP – Unterspannungsschutz / Kurzschluss",
   "modal.lvp_hint": "Abschaltung bei Spannungseinbruch (0.00 V = inaktiv/Default)",
+  "modal.brightness_label": "🔆 Display-Helligkeit (0xD6)",
+  "modal.brightness_hint": "IPS-Bildschirmhelligkeit am Netzteil (0–20)",
   "modal.refresh_btn": "🔄 Neu auslesen",
   "modal.refresh_title": "Schutzgrenzen aus dem Gerät abfragen",
   "modal.save_btn": "💾 Im Gerät speichern",

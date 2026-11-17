@@ -187,4 +187,20 @@ console.log('Running FNIRSI IPS3608 Protocol Tests...');
   console.log('✓ Device Info decoding (Firmware, Serial, Model) verified');
 }
 
+// 11. Test Display Brightness (0xD6) & Hardware Preset Slots M1..M6 (0xC5..0xD0)
+{
+  const brFrame = IPS3608Protocol.setBrightness(15);
+  assert.strictEqual(brFrame[0], 0xF1);
+  assert.strictEqual(brFrame[1], CmdType.WRITE_BYTE);
+  assert.strictEqual(brFrame[2], Register.BRIGHTNESS); // 0xD6
+  assert.strictEqual(brFrame[3], 1);
+  assert.strictEqual(brFrame[4], 15);
+  assert.strictEqual(brFrame[5], (0xD6 + 1 + 15) & 0xFF);
+
+  const p2 = IPS3608Protocol.setDevicePreset(2, 12.0, 3.0);
+  assert.strictEqual(p2.vFrame[2], 0xC7); // M2 V
+  assert.strictEqual(p2.aFrame[2], 0xC8); // M2 A
+  console.log('✓ Display Brightness (0xD6) & Hardware Preset (M1-M6) frames verified');
+}
+
 console.log('\nAll protocol tests passed cleanly!');

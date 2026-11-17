@@ -137,6 +137,8 @@ const elements = {
   inputLimitOpp: document.getElementById('inputLimitOpp'),
   inputLimitOtp: document.getElementById('inputLimitOtp'),
   inputLimitLvp: document.getElementById('inputLimitLvp'),
+  sliderBrightness: document.getElementById('sliderBrightness'),
+  dispBrightnessVal: document.getElementById('dispBrightnessVal'),
 
   inputTargetVoltage: document.getElementById('inputTargetVoltage'),
   sliderVoltage: document.getElementById('sliderVoltage'),
@@ -1098,6 +1100,26 @@ function initEvents() {
   }
   if (elements.btnSaveProtectionLimits) {
     elements.btnSaveProtectionLimits.addEventListener('click', saveProtectionLimits);
+  }
+  if (elements.sliderBrightness) {
+    const savedBrightness = localStorage.getItem('displayBrightness');
+    if (savedBrightness !== null) {
+      elements.sliderBrightness.value = savedBrightness;
+      if (elements.dispBrightnessVal) elements.dispBrightnessVal.textContent = savedBrightness;
+    }
+    elements.sliderBrightness.addEventListener('input', (e) => {
+      const level = parseInt(e.target.value, 10);
+      if (elements.dispBrightnessVal) elements.dispBrightnessVal.textContent = level;
+    });
+    elements.sliderBrightness.addEventListener('change', (e) => {
+      const level = parseInt(e.target.value, 10);
+      localStorage.setItem('displayBrightness', String(level));
+      if (elements.dispBrightnessVal) elements.dispBrightnessVal.textContent = level;
+      if (state.connected) {
+        ensurePcControlMode();
+        sendFrame(IPS3608Protocol.setBrightness(level), true);
+      }
+    });
   }
   if (elements.modalProtectionSettings) {
     elements.modalProtectionSettings.addEventListener('click', (e) => {

@@ -204,6 +204,28 @@ class IPS3608Protocol {
   }
 
   /**
+   * Command: Set Display Brightness (0..20, Register 0xD6)
+   */
+  static setBrightness(level) {
+    const val = Math.max(0, Math.min(20, Math.round(Number(level) || 0)));
+    return this.buildFrame(CmdType.WRITE_BYTE, Register.BRIGHTNESS, new Uint8Array([val]));
+  }
+
+  /**
+   * Command: Program Hardware Preset Slot M1..M6 (Registers 0xC5..0xD0)
+   * Returns { vFrame, aFrame } to write both Voltage and Current for the slot.
+   */
+  static setDevicePreset(slot, voltage, current) {
+    const s = Math.max(1, Math.min(6, Math.round(Number(slot) || 1)));
+    const vReg = 0xC3 + (2 * s);
+    const aReg = vReg + 1;
+    return {
+      vFrame: this.buildFrame(CmdType.WRITE, vReg, this.floatToBytes(voltage)),
+      aFrame: this.buildFrame(CmdType.WRITE, aReg, this.floatToBytes(current))
+    };
+  }
+
+  /**
    * Command: Reset / Clear Hardware Ah & Wh Capacity Accumulator (Register 0xD8 = 0x00, CMD_11)
    */
   static resetCapacity() {

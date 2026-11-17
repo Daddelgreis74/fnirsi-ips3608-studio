@@ -83,6 +83,8 @@
   "modal.otp_hint": "Shut down when heatsink temperature reaches this limit",
   "modal.lvp_label": "LVP – Under-Voltage / Short-Circuit",
   "modal.lvp_hint": "Shut down on voltage drop (0.00 V = inactive/default)",
+  "modal.brightness_label": "🔆 Display Brightness (0xD6)",
+  "modal.brightness_hint": "IPS screen brightness on the power supply (0–20)",
   "modal.refresh_btn": "🔄 Read from Device",
   "modal.refresh_title": "Read current protection limits from power supply",
   "modal.save_btn": "💾 Save to Device",

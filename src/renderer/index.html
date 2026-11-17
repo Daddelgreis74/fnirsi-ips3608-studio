@@ -23,7 +23,7 @@
       </div>
       <div class="brand-text">
         <h1>FNIRSI IPS3608 <span>STUDIO</span></h1>
-        <span class="version-tag">PRO CONTROL v1.5.0</span>
+        <span class="version-tag">PRO CONTROL v1.5.1</span>
         <button id="btnCheckUpdate" class="btn-update-chip" data-i18n-title="updater.check_title" title="Auf GitHub nach neuer Version suchen">
           <span id="btnCheckUpdateText" data-i18n="updater.check">🔄 Update</span>
         </button>
@@ -347,6 +347,17 @@
           <div class="field-input-group">
             <input type="number" id="inputLimitLvp" min="0.0" max="36.0" step="0.1" value="0.00">
             <span class="unit">V</span>
+          </div>
+        </div>
+
+        <div class="protection-field">
+          <div class="field-label-group">
+            <label for="sliderBrightness" data-i18n="modal.brightness_label">🔆 Display-Helligkeit (0xD6)</label>
+            <span class="field-hint" data-i18n="modal.brightness_hint">IPS-Bildschirmhelligkeit am Netzteil (0–20)</span>
+          </div>
+          <div class="field-input-group" style="gap: 10px;">
+            <input type="range" id="sliderBrightness" min="0" max="20" step="1" value="15" style="width: 90px; accent-color: var(--color-cyan); cursor: pointer;">
+            <span id="dispBrightnessVal" class="unit" style="width: 24px; text-align: right;">15</span>
           </div>
         </div>
 
