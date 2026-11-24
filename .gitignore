@@ -3,6 +3,13 @@ node_modules/
 
 # Build outputs
 dist/
+firmware/build/
+firmware/**/*.o
+firmware/**/*.d
+firmware/**/*.elf
+firmware/**/*.bin
+firmware/**/*.hex
+firmware/**/*.map
 
 # OS & Editor
 .DS_Store
