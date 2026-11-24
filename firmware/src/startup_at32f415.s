@@ -12,9 +12,29 @@
   .thumb_func
   .type Reset_Handler, %function
 Reset_Handler:
+  cpsid i
+
   /* Set initial stack pointer explicitly */
   ldr   r0, =_estack
   mov   sp, r0
+
+  /* Stop SysTick and clear any leftover bootloader IRQs before setting VTOR */
+  ldr   r0, =0xE000E010
+  movs  r1, #0
+  str   r1, [r0]
+
+  ldr   r0, =0xE000E180
+  mvn   r1, #0
+  str   r1, [r0, #0]
+  str   r1, [r0, #4]
+  str   r1, [r0, #8]
+
+  ldr   r0, =0xE000E280
+  str   r1, [r0, #0]
+  str   r1, [r0, #4]
+  str   r1, [r0, #8]
+  dsb
+  isb
 
   /* Relocate Vector Table to 0x08006800 (behind 26 KB bootloader) */
   ldr   r0, =0xE000ED08
@@ -53,6 +73,7 @@ ZeroBssCheck:
   blo   ZeroBssLoop
 
   bl    SystemInit
+  cpsie i
   bl    main
 
 LoopForever:

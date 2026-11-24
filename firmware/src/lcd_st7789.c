@@ -184,9 +184,9 @@ void lcd_init(void) {
   gpio_config_pin(LCD_SCK_PORT, LCD_SCK_PIN, GPIO_CFG_MUX_PP_50);
   gpio_config_pin(LCD_MOSI_PORT, LCD_MOSI_PIN, GPIO_CFG_MUX_PP_50);
 
-  /* SPI2 Master, 8-bit, SW CS, Mode 0, PCLK1/2 = 4 MHz */
+  /* SPI2 Master, 8-bit, SW CS, Mode 0, PCLK1/4 = 2 MHz */
   SPI2->ctrl2 = 0UL;
-  SPI2->ctrl1 = (1UL << 9) | (1UL << 8) | (1UL << 6) | (1UL << 2);
+  SPI2->ctrl1 = (1UL << 9) | (1UL << 8) | (1UL << 6) | (1UL << 3) | (1UL << 2);
 
   /* Hardware Reset sequence matching V1.9 timings */
   gpio_set(LCD_RST_PORT, LCD_RST_PIN);

@@ -21,8 +21,18 @@
 #define LCD_DC_PIN          6U
 #define LCD_RST_PORT        GPIOA
 #define LCD_RST_PIN         0U
-#define LCD_BL_PORT         GPIOA
-#define LCD_BL_PIN          1U      /* TMR5_CH2 backlight PWM in V1.9 */
+#define LCD_BL_PORT         GPIOB
+#define LCD_BL_PIN          8U      /* TMR4_CH3 backlight PWM in V1.9 (active HIGH) */
+
+/* Power-Hold, Output-Enable, Buzzer & Fan */
+#define PWR_HOLD_PORT       GPIOB
+#define PWR_HOLD_PIN        0U      /* Driven HIGH by V1.9 at startup */
+#define BUCK_EN_PORT        GPIOB
+#define BUCK_EN_PIN         10U     /* LOW = Buck output OFF */
+#define BUZZER_PORT         GPIOB
+#define BUZZER_PIN          6U      /* TMR4_CH1 buzzer PWM */
+#define FAN_PORT            GPIOB
+#define FAN_PIN             9U      /* TMR4_CH4 fan PWM */
 
 /* Buck PWM pins (forced LOW in Stage 1 Safe Bring-Up) */
 #define BUCK_VSET_PORT      GPIOA

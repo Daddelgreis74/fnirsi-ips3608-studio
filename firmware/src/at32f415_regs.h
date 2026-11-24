@@ -14,6 +14,9 @@ typedef struct {
   volatile uint32_t apb1en;
   volatile uint32_t bpdc;
   volatile uint32_t ctrlsts;
+  volatile uint32_t ahbrst;
+  volatile uint32_t misc1;
+  volatile uint32_t misc2;
 } CRM_TypeDef;
 
 typedef struct {
@@ -98,6 +101,7 @@ typedef struct {
 
 #define SCB_VTOR        (*(volatile uint32_t *)0xE000ED08UL)
 #define SCB_CPACR       (*(volatile uint32_t *)0xE000ED88UL)
+#define PWC_LDOOV       (*(volatile uint8_t *)0x40007050UL)
 
 /* CRM APB2EN bits */
 #define CRM_APB2_IOMUX  (1UL << 0)
@@ -111,6 +115,7 @@ typedef struct {
 
 /* CRM APB1EN bits */
 #define CRM_APB1_SPI2   (1UL << 14)
+#define CRM_APB1_PWC    (1UL << 28)
 
 /* GPIO 4-bit CFGLR/CFGHR nibbles */
 #define GPIO_CFG_ANALOG    0x0U
