@@ -85,9 +85,9 @@ static uint32_t crm_init_pll_144mhz(void) {
   FLASH_PSR = 0x14UL;
 
   /* APB1=/2 (72 MHz), APB2=/2 (72 MHz), ADC=/6 (12 MHz),
-   * PLLSRC=HICK/2 (4 MHz), PLLMULT=x36 (144 MHz), USBDIV=/3 (48 MHz) */
+   * PLLSRC=HICK/2 (4 MHz), PLLMULT=x36 (144 MHz), USBDIV=5 (/3 = 48.0 MHz) */
   CRM->cfg = (4UL << 8) | (4UL << 11) | (2UL << 14) |
-             (3UL << 18) | (2UL << 29) | 0x00800000UL;
+             (3UL << 18) | (2UL << 29) | 0x08400000UL;
 
   /* Auto step-by-step switch for >108 MHz SCLK */
   CRM->misc2 |= (0x3UL << 4);

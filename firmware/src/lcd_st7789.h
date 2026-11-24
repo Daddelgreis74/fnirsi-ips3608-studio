@@ -5,9 +5,9 @@
 
 #define RGB565(r, g, b) ((uint16_t)((((r) & 0xF8U) << 8) | (((g) & 0xFCU) << 3) | (((b) & 0xF8U) >> 3)))
 
-#define COLOR_BG        RGB565(12, 18, 30)
+#define COLOR_BG        RGB565(0, 0, 0)
 #define COLOR_HEADER    RGB565(0, 72, 110)
-#define COLOR_SAFE_BG   RGB565(150, 24, 40)
+#define COLOR_SAFE_BG   RGB565(180, 16, 16)
 #define COLOR_SAFE_OK   RGB565(20, 110, 60)
 #define COLOR_CYAN      RGB565(0, 220, 255)
 #define COLOR_AMBER     RGB565(255, 190, 40)

@@ -179,8 +179,8 @@ static void handle_frame(uint8_t cmd, uint8_t reg, const uint8_t *data, uint8_t 
   if (cmd == CMD_READ) {
     switch (reg) {
       case REG_MODEL:       send_str_frame(reg, "IPS3608"); break;
-      case REG_SERIAL:      send_str_frame(reg, "OPENFW-020"); break;
-      case REG_FIRMWARE:    send_str_frame(reg, "OpenFW 0.2.0"); break;
+      case REG_SERIAL:      send_str_frame(reg, "OPENFW-021"); break;
+      case REG_FIRMWARE:    send_str_frame(reg, "OpenFW 0.2.1"); break;
       case REG_MAX_VOLTAGE: send_u32_le_frame(CMD_READ, reg, F32_36_0); break;
       case REG_MAX_CURRENT: send_u32_le_frame(CMD_READ, reg, F32_8_0); break;
       case REG_SET_VOLTAGE: send_u32_le_frame(CMD_READ, reg, g_state.target_v_bits); break;

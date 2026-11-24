@@ -33,11 +33,11 @@ static void draw_static_layout(void) {
 
   /* Header Bar */
   lcd_fill_rect(0U, 0U, LCD_WIDTH, 32U, COLOR_HEADER);
-  lcd_draw_string(10U, 9U, "IPS3608 OPEN FW v0.2.0", COLOR_CYAN, COLOR_HEADER, 2U);
+  lcd_draw_string(10U, 9U, "IPS3608 OPEN FW v0.2.1", COLOR_CYAN, COLOR_HEADER, 2U);
 
   /* Safety Banner */
   lcd_fill_rect(8U, 40U, LCD_WIDTH - 16U, 26U, COLOR_SAFE_BG);
-  lcd_draw_string(10U, 46U, "SAFE: AUSGANG AUS v0.2.0", COLOR_WHITE, COLOR_SAFE_BG, 2U);
+  lcd_draw_string(10U, 46U, "SAFE: AUSGANG AUS v0.2.1", COLOR_WHITE, COLOR_SAFE_BG, 2U);
 
   lcd_draw_string(10U, 74U, "MCU: AT32F415 @ 144MHz (USB 48MHz)", COLOR_MUTED, COLOR_BG, 1U);
   lcd_draw_string(10U, 92U, "ADC1 Rohwerte (0..4095):", COLOR_AMBER, COLOR_BG, 1U);
@@ -75,7 +75,7 @@ int main(void) {
 
   board_safe_power_off();
   usart_diag_init();
-  usart_puts("\n=== IPS3608 OPEN FW v0.2.0 (Stage 2A: 144MHz + USB-CDC) ===\n");
+  usart_puts("\n=== IPS3608 OPEN FW v0.2.1 (Stage 2A: 144MHz + USB-CDC) ===\n");
   usart_puts("Buck PWM (PA6/PA7) & Power-Enable Pins forced LOW.\n");
 
   inputs_init();

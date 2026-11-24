@@ -116,7 +116,7 @@ static const uint8_t k_str_ser[38] = {
   38U, 0x03U,
   'I',0, 'P',0, 'S',0, '3',0, '6',0, '0',0, '8',0, '-',0,
   'O',0, 'P',0, 'E',0, 'N',0, 'F',0, 'W',0, '-',0,
-  '0',0, '2',0, '0',0
+  '0',0, '2',0, '1',0
 };
 
 void OTGFS1_IRQHandler(void);
@@ -574,8 +574,8 @@ void usb_cdc_init(void) {
   OTGFS_GLOBAL->gusbcfg = (1UL << 30) | (5UL << 10) | (1UL << 6);
   delay_ms(25U);
 
-  /* Activate USB FS transceiver and ignore VBUS pin (PA9 is USART1_TX) */
-  OTGFS_GLOBAL->gccfg = (1UL << 16) | (1UL << 21);
+  /* Activate USB FS transceiver, A/B VBUS sensing & VBUSIG (matches V1.9 0x002D0000) */
+  OTGFS_GLOBAL->gccfg = (1UL << 16) | (1UL << 18) | (1UL << 19) | (1UL << 21);
 
   /* Soft-disconnect briefly so attached host re-enumerates immediately after flash */
   OTGFS_DEVICE->dctl |= (1UL << 1);
