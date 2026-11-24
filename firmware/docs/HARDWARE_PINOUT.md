@@ -33,7 +33,7 @@ Ermittelt durch statische Disassembly-Analyse der offiziellen Firmware **`APP_IP
 | **CS** | `PB12` | `GPIOB` `OUT_PP` | `0x0800EF1A` |
 | **DC / RS** | `PC6` | `GPIOC` `OUT_PP` (`0=CMD`, `1=DATA`) | `0x0800EF08`, `0x0800F454`, `0x0800F4BC` |
 | **RESET** | `PA0` | `GPIOA` `OUT_PP` | `0x0800EF2E` |
-| **Backlight (PWM)** | `PB8` | `GPIOB` `TMR4_CH3` (`0..1000`, aktiv HIGH) | `0x080165DC`, `0x0800D830` |
+| **Backlight (PWM)** | `PB9` | `GPIOB` `TMR4_CH4` (aktiv HIGH) | `0x08016590` |
 | **DMA** | `DMA1_Ch5` | `IRQ 15` | SPI2 TX Framebuffer |
 
 Verifizierte `ST7789V`-Init-Kommandos aus `0x0800EF84–0x0800F104`: `0x11` (SLPOUT), `0x36` (MADCTL), `0x3A=0x05` (16-bit RGB565), `0xB2`, `0xB7=0x35`, `0xBB=0x28`, `0xC0=0x2C`, `0xC2`, `0xC3=0x0B`, `0xC4=0x20`, `0xC6=0x0F`, `0xD0={0xA4,0xA1}`, `0xE0`, `0xE1`, `0x29` (DISPON).
@@ -45,7 +45,7 @@ Verifizierte `ST7789V`-Init-Kommandos aus `0x0800EF84–0x0800F104`: `0x11` (SLP
 | **Buck Vset / Iset PWM** | `TMR3` (`CH1`, `CH2`) | `PA6` (`CH1`), `PA7` (`CH2`) | `0x0801A7EC`, `0x08008B00`, `0x08008B80` |
 | **ADC-Scan-Sequenz (6 Kanäle)** | `ADC1` + `DMA1_Ch1` (`IRQ 11`) | Rank 1: `IN13` (`PC3`)<br>Rank 2: `IN2` (`PA2`)<br>Rank 3: `IN3` (`PA3`)<br>Rank 4: `IN4` (`PA4`)<br>Rank 5: `IN14` (`PC4`)<br>Rank 6: `IN15` (`PC5`) | `0x0800774E–0x0800787A` (je `239.5` Zyklen) |
 | **ADC-Hardware-Trigger** | `TMR1` (`CH2`) | intern | `0x0801BA4A` (`ARR=1`, `CCR2=1`) |
-| **Buzzer / Backlight / Fan PWM** | `TMR4` (`CH1`, `CH3`, `CH4`) | `PB6` (Buzzer), `PB8` (Backlight), `PB9` (Lüfter) | `0x080087BA–0x080088A8`, `0x08016590–0x08016620` |
+| **Buzzer / Fan / Backlight PWM** | `TMR4` (`CH1`, `CH3`, `CH4`) | `PB6` (Buzzer), `PB8` (Lüfter, 30°C/35°C Schwellen), `PB9` (Backlight) | `0x080087BA–0x080088A8`, `0x08016590–0x08016620`, `0x0800D830` |
 | **Regeltakt / System-Timer** | `TMR10` (`IRQ 25`) | intern (`ARR=9999`) | `0x0801BAEC` |
 
 > *Hinweis für Stufe 2:* Die exakte Zuordnung der 6 ADC-Kanäle zu `Vin / Vout / Iout / Temp / Aux` wird im nächsten Schritt live mit dem Safe Bring-Up + V1.9-Regelkreis-Disassembly verifiziert, bevor `TMR3` oder `PB10` (`BUCK_EN`) aktiviert wird.
