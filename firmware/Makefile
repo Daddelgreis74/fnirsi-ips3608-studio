@@ -11,6 +11,8 @@ C_SRCS := \
 	src/lcd_st7789.c \
 	src/adc_monitor.c \
 	src/usart_diag.c \
+	src/usb_cdc.c \
+	src/ips_protocol.c \
 	src/main.c
 
 ASM_SRCS := \
@@ -21,7 +23,7 @@ OBJS := \
 	$(patsubst src/%.s,$(BUILD_DIR)/%.o,$(ASM_SRCS))
 
 ARCH_FLAGS := -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-CFLAGS     := $(ARCH_FLAGS) -std=c11 -Os -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Isrc
+CFLAGS     := $(ARCH_FLAGS) -std=c11 -Os -ffunction-sections -fdata-sections -fno-tree-loop-distribute-patterns -fno-builtin -Wall -Wextra -Werror -Isrc
 ASFLAGS    := $(ARCH_FLAGS) -x assembler-with-cpp
 LDFLAGS    := $(ARCH_FLAGS) -T$(LDSCRIPT) -nostdlib -Wl,--gc-sections -Wl,-Map=$(BUILD_DIR)/$(TARGET).map
 

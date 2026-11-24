@@ -78,14 +78,55 @@ void board_safe_power_off(void) {
   gpio_config_pin(GPIOF, 7U, GPIO_CFG_OUT_PP_50);
 }
 
+static uint32_t crm_init_pll_144mhz(void) {
+  volatile uint32_t timeout;
+
+  /* 4 Flash wait states + prefetch for 144 MHz SCLK */
+  FLASH_PSR = 0x14UL;
+
+  /* APB1=/2 (72 MHz), APB2=/2 (72 MHz), ADC=/6 (12 MHz),
+   * PLLSRC=HICK/2 (4 MHz), PLLMULT=x36 (144 MHz), USBDIV=/3 (48 MHz) */
+  CRM->cfg = (4UL << 8) | (4UL << 11) | (2UL << 14) |
+             (3UL << 18) | (2UL << 29) | 0x00800000UL;
+
+  /* Auto step-by-step switch for >108 MHz SCLK */
+  CRM->misc2 |= (0x3UL << 4);
+
+  /* Enable PLL and wait for lock */
+  CRM->ctrl |= (1UL << 24);
+  for (timeout = 0UL; timeout < 1000000UL; timeout++) {
+    if ((CRM->ctrl & (1UL << 25)) != 0UL) {
+      break;
+    }
+  }
+
+  if ((CRM->ctrl & (1UL << 25)) != 0UL) {
+    CRM->cfg = (CRM->cfg & ~0x3UL) | 0x2UL;
+    for (timeout = 0UL; timeout < 1000000UL; timeout++) {
+      if ((CRM->cfg & 0x0CUL) == 0x08UL) {
+        CRM->misc2 &= ~(0x3UL << 4);
+        return SYSCLK_HZ;
+      }
+    }
+  }
+
+  CRM->misc2 &= ~(0x3UL << 4);
+  return 8000000UL;
+}
+
 void SystemInit(void) {
+  uint32_t sysclk_hz;
+
   crm_reset_to_hick();
 
-  /* Force safe power-off state before initializing peripherals */
+  /* Force safe power-off state before raising clocks or initializing peripherals */
   board_safe_power_off();
 
-  /* Configure SysTick for 1 ms tick using 8 MHz HICK */
-  SYSTICK->load = (SYSCLK_HZ / 1000UL) - 1UL;
+  /* Switch to 144 MHz PLL (72 MHz APB1/APB2, 48 MHz USB) */
+  sysclk_hz = crm_init_pll_144mhz();
+
+  /* Configure SysTick for 1 ms tick */
+  SYSTICK->load = (sysclk_hz / 1000UL) - 1UL;
   SYSTICK->val  = 0UL;
   SYSTICK->ctrl = 0x07UL;
 }

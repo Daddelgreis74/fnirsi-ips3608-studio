@@ -100,8 +100,14 @@ typedef struct {
 #define SYSTICK         ((SysTick_TypeDef *)0xE000E010UL)
 
 #define SCB_VTOR        (*(volatile uint32_t *)0xE000ED08UL)
+#define SCB_AIRCR       (*(volatile uint32_t *)0xE000ED0CUL)
 #define SCB_CPACR       (*(volatile uint32_t *)0xE000ED88UL)
+#define NVIC_ISER2      (*(volatile uint32_t *)0xE000E108UL)
+#define FLASH_PSR       (*(volatile uint32_t *)0x40022000UL)
 #define PWC_LDOOV       (*(volatile uint8_t *)0x40007050UL)
+
+/* CRM AHBEN / AHBRST bits */
+#define CRM_AHB_OTGFS1  (1UL << 12)
 
 /* CRM APB2EN bits */
 #define CRM_APB2_IOMUX  (1UL << 0)
@@ -149,5 +155,68 @@ static inline void gpio_config_input_pu(GPIO_TypeDef *gpio, uint8_t pin) {
 static inline uint8_t gpio_read(const GPIO_TypeDef *gpio, uint8_t pin) {
   return (uint8_t)((gpio->idt >> pin) & 1U);
 }
+
+/* --------------------------------------------------------------------------
+ * OTGFS1 (Synopsys DWC2 Full-Speed USB OTG Controller @ 0x50000000)
+ * -------------------------------------------------------------------------- */
+#define OTGFS1_BASE         0x50000000UL
+#define OTGFS1_IRQn         67U
+
+typedef struct {
+  volatile uint32_t gotgctl;       /* 0x000 */
+  volatile uint32_t gotgint;       /* 0x004 */
+  volatile uint32_t gahbcfg;       /* 0x008 */
+  volatile uint32_t gusbcfg;       /* 0x00C */
+  volatile uint32_t grstctl;       /* 0x010 */
+  volatile uint32_t gintsts;       /* 0x014 */
+  volatile uint32_t gintmsk;       /* 0x018 */
+  volatile uint32_t grxstsr;       /* 0x01C */
+  volatile uint32_t grxstsp;       /* 0x020 */
+  volatile uint32_t grxfsiz;       /* 0x024 */
+  volatile uint32_t dieptxf0;      /* 0x028 */
+  volatile uint32_t hnptxsts;      /* 0x02C */
+  volatile uint32_t reserved0[2];  /* 0x030..0x034 */
+  volatile uint32_t gccfg;         /* 0x038 */
+  volatile uint32_t guid;          /* 0x03C */
+  volatile uint32_t reserved1[48]; /* 0x040..0x0FC */
+  volatile uint32_t hptxfsiz;      /* 0x100 */
+  volatile uint32_t dieptxf1;      /* 0x104 */
+  volatile uint32_t dieptxf2;      /* 0x108 */
+  volatile uint32_t dieptxf3;      /* 0x10C */
+} OTGFS_Global_TypeDef;
+
+typedef struct {
+  volatile uint32_t dcfg;          /* 0x800 */
+  volatile uint32_t dctl;          /* 0x804 */
+  volatile uint32_t dsts;          /* 0x808 */
+  volatile uint32_t reserved0;     /* 0x80C */
+  volatile uint32_t diepmsk;       /* 0x810 */
+  volatile uint32_t doepmsk;       /* 0x814 */
+  volatile uint32_t daint;         /* 0x818 */
+  volatile uint32_t daintmsk;      /* 0x81C */
+  volatile uint32_t reserved1[2];  /* 0x820..0x824 */
+  volatile uint32_t dvbusdis;      /* 0x828 */
+  volatile uint32_t dvbuspulse;    /* 0x82C */
+  volatile uint32_t reserved2;     /* 0x830 */
+  volatile uint32_t diepempmsk;    /* 0x834 */
+} OTGFS_Device_TypeDef;
+
+typedef struct {
+  volatile uint32_t ctl;           /* +0x00 */
+  volatile uint32_t reserved0;     /* +0x04 */
+  volatile uint32_t tint;          /* +0x08 */
+  volatile uint32_t reserved1;     /* +0x0C */
+  volatile uint32_t tsiz;          /* +0x10 */
+  volatile uint32_t reserved2;     /* +0x14 */
+  volatile uint32_t dtxfsts;       /* +0x18 */
+  volatile uint32_t reserved3;     /* +0x1C */
+} OTGFS_Endpoint_TypeDef;
+
+#define OTGFS_GLOBAL        ((OTGFS_Global_TypeDef *)OTGFS1_BASE)
+#define OTGFS_DEVICE        ((OTGFS_Device_TypeDef *)(OTGFS1_BASE + 0x800UL))
+#define OTGFS_INEP(n)       ((OTGFS_Endpoint_TypeDef *)(OTGFS1_BASE + 0x900UL + 0x20UL * (uint32_t)(n)))
+#define OTGFS_OUTEP(n)      ((OTGFS_Endpoint_TypeDef *)(OTGFS1_BASE + 0xB00UL + 0x20UL * (uint32_t)(n)))
+#define OTGFS_PCGCCTL       (*(volatile uint32_t *)(OTGFS1_BASE + 0xE00UL))
+#define OTGFS_FIFO(n)       ((volatile uint32_t *)(OTGFS1_BASE + 0x1000UL + 0x1000UL * (uint32_t)(n)))
 
 #endif /* AT32F415_REGS_H */

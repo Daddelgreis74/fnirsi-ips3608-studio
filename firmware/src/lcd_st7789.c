@@ -184,9 +184,9 @@ void lcd_init(void) {
   gpio_config_pin(LCD_SCK_PORT, LCD_SCK_PIN, GPIO_CFG_MUX_PP_50);
   gpio_config_pin(LCD_MOSI_PORT, LCD_MOSI_PIN, GPIO_CFG_MUX_PP_50);
 
-  /* SPI2 Master, 8-bit, SW CS, Mode 0, PCLK1/4 = 2 MHz */
+  /* SPI2 Master, 8-bit, SW CS, Mode 0, PCLK1/8 = 9 MHz */
   SPI2->ctrl2 = 0UL;
-  SPI2->ctrl1 = (1UL << 9) | (1UL << 8) | (1UL << 6) | (1UL << 3) | (1UL << 2);
+  SPI2->ctrl1 = (1UL << 9) | (1UL << 8) | (1UL << 6) | (2UL << 3) | (1UL << 2);
 
   /* Hardware Reset sequence matching V1.9 timings */
   gpio_set(LCD_RST_PORT, LCD_RST_PIN);
@@ -239,12 +239,20 @@ void lcd_init(void) {
   lcd_write_cmd(0xE1U);
   lcd_write_data(e1_seq, sizeof(e1_seq));
 
-  lcd_write_cmd(0x21U); /* INVON (IPS panel) */
+  lcd_write_cmd(0x20U); /* INVOFF (required for IPS3608 panel) */
   lcd_write_cmd(0x29U); /* DISPON */
   delay_ms(20U);
 
   /* Turn backlight ON */
-  gpio_set(LCD_BL_PORT, LCD_BL_PIN);
+  lcd_set_backlight(1U);
+}
+
+void lcd_set_backlight(uint8_t on) {
+  if (on != 0U) {
+    gpio_set(LCD_BL_PORT, LCD_BL_PIN);
+  } else {
+    gpio_clear(LCD_BL_PORT, LCD_BL_PIN);
+  }
 }
 
 void lcd_fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {

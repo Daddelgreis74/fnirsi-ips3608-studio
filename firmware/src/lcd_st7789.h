@@ -16,6 +16,7 @@
 #define COLOR_MUTED     RGB565(150, 168, 190)
 
 void lcd_init(void);
+void lcd_set_backlight(uint8_t on);
 void lcd_fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
 void lcd_draw_char(uint16_t x, uint16_t y, char ch, uint16_t fg, uint16_t bg, uint8_t scale);
 void lcd_draw_string(uint16_t x, uint16_t y, const char *s, uint16_t fg, uint16_t bg, uint8_t scale);

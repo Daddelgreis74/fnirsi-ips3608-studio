@@ -3,6 +3,8 @@
 #include "lcd_st7789.h"
 #include "adc_monitor.h"
 #include "usart_diag.h"
+#include "usb_cdc.h"
+#include "ips_protocol.h"
 
 static void inputs_init(void) {
   CRM->apb2en |= CRM_APB2_GPIOB | CRM_APB2_GPIOC | CRM_APB2_GPIOF;
@@ -31,13 +33,13 @@ static void draw_static_layout(void) {
 
   /* Header Bar */
   lcd_fill_rect(0U, 0U, LCD_WIDTH, 32U, COLOR_HEADER);
-  lcd_draw_string(10U, 9U, "IPS3608 OPEN FW v0.1.2", COLOR_CYAN, COLOR_HEADER, 2U);
+  lcd_draw_string(10U, 9U, "IPS3608 OPEN FW v0.2.0", COLOR_CYAN, COLOR_HEADER, 2U);
 
   /* Safety Banner */
   lcd_fill_rect(8U, 40U, LCD_WIDTH - 16U, 26U, COLOR_SAFE_BG);
-  lcd_draw_string(10U, 46U, "SAFE: AUSGANG AUS v0.1.2", COLOR_WHITE, COLOR_SAFE_BG, 2U);
+  lcd_draw_string(10U, 46U, "SAFE: AUSGANG AUS v0.2.0", COLOR_WHITE, COLOR_SAFE_BG, 2U);
 
-  lcd_draw_string(10U, 74U, "MCU: AT32F415CCT7 (8MHz HICK)", COLOR_MUTED, COLOR_BG, 1U);
+  lcd_draw_string(10U, 74U, "MCU: AT32F415 @ 144MHz (USB 48MHz)", COLOR_MUTED, COLOR_BG, 1U);
   lcd_draw_string(10U, 92U, "ADC1 Rohwerte (0..4095):", COLOR_AMBER, COLOR_BG, 1U);
 
   lcd_draw_string(10U, 108U, "CH0 PC3 (IN13):", COLOR_WHITE, COLOR_BG, 1U);
@@ -52,8 +54,12 @@ static void draw_static_layout(void) {
   lcd_draw_string(10U, 176U, "ENC PC7/PC8:", COLOR_WHITE, COLOR_BG, 1U);
   lcd_draw_string(110U, 176U, "TASTEN PB1/PB11/PF5:", COLOR_WHITE, COLOR_BG, 1U);
 
-  lcd_draw_string(10U, 206U, "Flash >= 0x08006800 | Cal 0x0803F000 OK", COLOR_GREEN, COLOR_BG, 1U);
-  lcd_draw_string(10U, 222U, "Bootloader: Obere Taste + Einschalten", COLOR_MUTED, COLOR_BG, 1U);
+  lcd_draw_string(10U, 192U, "USB 2E3C:5740:", COLOR_WHITE, COLOR_BG, 1U);
+  lcd_draw_string(150U, 192U, "RX:", COLOR_WHITE, COLOR_BG, 1U);
+  lcd_draw_string(216U, 192U, "TX:", COLOR_WHITE, COLOR_BG, 1U);
+
+  lcd_draw_string(10U, 208U, "Flash >= 0x08006800 | Cal 0x0803F000 OK", COLOR_GREEN, COLOR_BG, 1U);
+  lcd_draw_string(10U, 223U, "Bootloader: Obere Taste + Einschalten", COLOR_MUTED, COLOR_BG, 1U);
 }
 
 int main(void) {
@@ -63,19 +69,34 @@ int main(void) {
   uint32_t last_refresh = 0U;
   uint32_t loop_count = 0U;
 
+  for (uint8_t i = 0U; i < ADC_CH_COUNT; i++) {
+    adc[i] = 0U;
+  }
+
   board_safe_power_off();
   usart_diag_init();
-  usart_puts("\n=== IPS3608 OPEN FW v0.1.2 (Stage 1 Safe Bring-Up) ===\n");
+  usart_puts("\n=== IPS3608 OPEN FW v0.2.0 (Stage 2A: 144MHz + USB-CDC) ===\n");
   usart_puts("Buck PWM (PA6/PA7) & Power-Enable Pins forced LOW.\n");
 
   inputs_init();
   adc_monitor_init();
   lcd_init();
+  ips_protocol_init();
+  usb_cdc_init();
   draw_static_layout();
+  adc_read_all(adc);
 
   for (;;) {
     uint32_t now = millis();
+
+    /* Process Studio USB-CDC protocol frames immediately */
+    ips_protocol_poll(adc);
+
     if ((now - last_refresh) >= 200U) {
+      const ips_state_t *st = ips_protocol_state();
+      const char *usb_label = "WARTE ";
+      uint16_t usb_color = COLOR_MUTED;
+
       last_refresh = now;
       board_safe_power_off();
       adc_read_all(adc);
@@ -104,12 +125,32 @@ int main(void) {
       io_str[5] = '\0';
       lcd_draw_string(234U, 176U, io_str, COLOR_GREEN, COLOR_BG, 1U);
 
+      /* Live USB-CDC & Studio protocol counters */
+      if (st->connected != 0U) {
+        usb_label = "STUDIO";
+        usb_color = COLOR_GREEN;
+      } else if (usb_cdc_is_configured() != 0U) {
+        usb_label = "BEREIT";
+        usb_color = COLOR_CYAN;
+      }
+      lcd_draw_string(98U, 192U, usb_label, usb_color, COLOR_BG, 1U);
+
+      fmt_u32_fixed(num, st->rx_packets, 5U);
+      lcd_draw_string(170U, 192U, num, COLOR_CYAN, COLOR_BG, 1U);
+
+      fmt_u32_fixed(num, st->tx_packets, 5U);
+      lcd_draw_string(236U, 192U, num, COLOR_CYAN, COLOR_BG, 1U);
+
       if ((loop_count % 5U) == 0U) {
         usart_puts("ADC1:");
         for (uint8_t i = 0U; i < ADC_CH_COUNT; i++) {
           usart_putc(' ');
           usart_put_u32(adc[i]);
         }
+        usart_puts(" USB:");
+        usart_puts(usb_label);
+        usart_puts(" RX=");
+        usart_put_u32(st->rx_packets);
         usart_putc('\n');
       }
       loop_count++;

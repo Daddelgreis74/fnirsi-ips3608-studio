@@ -3,8 +3,10 @@
 
 #include "at32f415_regs.h"
 
-/* System clock: safe 8 MHz internal HICK oscillator for Stage 1 Bring-Up */
-#define SYSCLK_HZ           8000000UL
+/* System clocks: 144 MHz SYSCLK (HICK PLL), 72 MHz APB1/APB2, 48 MHz USB */
+#define SYSCLK_HZ           144000000UL
+#define APB1_HZ             72000000UL
+#define APB2_HZ             72000000UL
 
 /* IPS LCD (ST7789V 320x240 via SPI2) */
 #define LCD_WIDTH           320U

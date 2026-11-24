@@ -10,8 +10,8 @@ void usart_diag_init(void) {
   USART1->ctrl1 = 0UL;
   USART1->ctrl2 = 0UL;
   USART1->ctrl3 = 0UL;
-  /* 115200 baud at 8 MHz PCLK2 */
-  USART1->baudr = (SYSCLK_HZ + 57600UL) / 115200UL;
+  /* 115200 baud at 72 MHz PCLK2 */
+  USART1->baudr = (APB2_HZ + 57600UL) / 115200UL;
   USART1->ctrl1 = (1UL << 13) | (1UL << 3); /* UEN | TEN */
 }
 
