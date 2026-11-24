@@ -2,7 +2,7 @@
  * FNIRSI IPS3608 Studio - Main Renderer Application
  */
 
-const { ipcRenderer } = (typeof require !== 'undefined') ? require('electron') : { ipcRenderer: null };
+const ipsApi = (typeof window !== 'undefined' && window.ipsApi) ? window.ipsApi : null;
 
 // ==========================================================================
 // i18n Initialization (German, English, French)
@@ -33,13 +33,10 @@ const state = {
   energyWh: 0.00,
   startTime: null,
 
-  // Serial Port References
-  port: null,
-  reader: null,
-  writer: null,
-  keepReading: false,
+  // Serial Communication Buffers
   readBuffer: new Uint8Array(0),
   pnpPorts: [],
+  awaitingLimitsRefresh: false,
 
   // Data Logger
   logging: false,
@@ -154,18 +151,29 @@ const elements = {
 };
 
 // ==========================================================================
-// Serial Communication & Auto-Detection Engine (Native .NET SerialPort Bridge)
+// Serial Communication & Auto-Detection Engine (Preload Serial Bridge)
 // ==========================================================================
 
 async function scanSystemComPorts() {
-  if (!ipcRenderer) return [];
+  if (!ipsApi) return [];
   try {
-    const ports = await ipcRenderer.invoke('serial:scan-ports');
+    const ports = await ipsApi.scanPorts();
     state.pnpPorts = Array.isArray(ports) ? ports : [];
     return state.pnpPorts;
   } catch (err) {
     console.warn('PnP scan failed:', err);
     return [];
+  }
+}
+
+function syncUsbLedFromState() {
+  if (state.connected) {
+    updateUsbLedUI('connected', state.detectedPortName);
+  } else if (state.connecting) {
+    updateUsbLedUI('connecting', state.detectedPortName);
+  } else {
+    const best = state.pnpPorts.find(p => p.isFnirsi) || state.pnpPorts.find(p => p.isKnownUsb || p.isUsb);
+    updateUsbLedUI('searching', best ? best.comPort : 'USB');
   }
 }
 
@@ -190,15 +198,8 @@ function updateUsbLedUI(statusMode, portName = null) {
 
 async function refreshPortList() {
   try {
-    const pnpPorts = await scanSystemComPorts();
-    if (state.connected) {
-      updateUsbLedUI('connected', state.detectedPortName);
-    } else if (state.connecting) {
-      updateUsbLedUI('connecting', state.detectedPortName);
-    } else {
-      const best = pnpPorts.find(p => p.isFnirsi) || pnpPorts.find(p => p.isKnownUsb || p.isUsb);
-      updateUsbLedUI('searching', best ? best.comPort : 'USB');
-    }
+    await scanSystemComPorts();
+    syncUsbLedFromState();
   } catch (err) {
     console.error('Error fetching ports:', err);
   }
@@ -207,7 +208,7 @@ async function refreshPortList() {
 let connectTimeoutTimer = null;
 
 async function autoScanAndConnect() {
-  if (state.connected || state.connecting || state.manualDisconnect || !ipcRenderer) return;
+  if (state.connected || state.connecting || state.manualDisconnect || !ipsApi) return;
 
   try {
     const pnpPorts = await scanSystemComPorts();
@@ -229,7 +230,7 @@ async function connectSerial(silent = false, explicitPort = null) {
     return;
   }
 
-  if (state.connecting || !ipcRenderer) return;
+  if (state.connecting || !ipsApi) return;
   state.connecting = true;
   state.manualDisconnect = false;
   state.silentConnect = silent;
@@ -239,7 +240,7 @@ async function connectSerial(silent = false, explicitPort = null) {
     if (state.connecting && !state.connected) {
       console.warn('Serial connect timed out, resetting state');
       state.connecting = false;
-      ipcRenderer.invoke('serial:disconnect').catch(() => {});
+      ipsApi.disconnect().catch(() => {});
       updateConnectionUI(false);
     }
   }, 7000);
@@ -257,7 +258,7 @@ async function connectSerial(silent = false, explicitPort = null) {
       state.connecting = false;
       updateUsbLedUI('searching', 'USB');
       if (!silent) {
-        alert(t('dialog.connect_error', { message: t('header.port_placeholder') }));
+        alert(t('dialog.connect_error', { message: t('header.usb_searching') }));
       }
       return;
     }
@@ -265,7 +266,7 @@ async function connectSerial(silent = false, explicitPort = null) {
     state.detectedPortName = targetPort;
     updateUsbLedUI('connecting', targetPort);
     state.readBuffer = new Uint8Array(0);
-    await ipcRenderer.invoke('serial:connect', targetPort);
+    await ipsApi.connect(targetPort);
   } catch (err) {
     if (connectTimeoutTimer) clearTimeout(connectTimeoutTimer);
     console.error('Serial connection failed:', err);
@@ -347,7 +348,7 @@ function toggleKeyLock() {
   }
 }
 
-async function disconnectSerial() {
+async function disconnectSerial(skipUnlock = false) {
   if (connectTimeoutTimer) {
     clearTimeout(connectTimeoutTimer);
     connectTimeoutTimer = null;
@@ -359,9 +360,9 @@ async function disconnectSerial() {
   clearTxQueues();
 
   // Send official disconnect/unlock packet (CMD_2: F1 C1 00 01 00 01) directly before closing
-  if (state.connected && ipcRenderer) {
+  if (!skipUnlock && state.connected && ipsApi) {
     try {
-      ipcRenderer.send('serial:send', Array.from(IPS3608Protocol.disconnectPacket()));
+      ipsApi.send(Array.from(IPS3608Protocol.disconnectPacket()));
       await new Promise(r => setTimeout(r, 60));
     } catch (e) {}
   }
@@ -369,9 +370,9 @@ async function disconnectSerial() {
   state.connected = false;
   state.connecting = false;
 
-  if (ipcRenderer) {
+  if (ipsApi) {
     try {
-      await ipcRenderer.invoke('serial:disconnect');
+      await ipsApi.disconnect();
     } catch (e) {}
   }
 
@@ -381,6 +382,8 @@ async function disconnectSerial() {
   updateTelemetryDisplays();
 }
 
+const MAX_READ_BUFFER_BYTES = 4096;
+
 function handleIncomingBytes(chunk) {
   const combined = new Uint8Array(state.readBuffer.length + chunk.length);
   combined.set(state.readBuffer);
@@ -388,7 +391,10 @@ function handleIncomingBytes(chunk) {
   state.readBuffer = combined;
 
   const { frames, remainingBuffer } = IPS3608Protocol.parseStream(state.readBuffer);
-  state.readBuffer = remainingBuffer;
+  // Guard against unbounded buffer growth on corrupted serial noise
+  state.readBuffer = remainingBuffer.length > MAX_READ_BUFFER_BYTES
+    ? remainingBuffer.slice(remainingBuffer.length - 256)
+    : remainingBuffer;
 
   if (frames.length > 0) {
     state.lastRxTime = Date.now();
@@ -411,7 +417,7 @@ function clearTxQueues() {
 }
 
 function sendFrame(frameBytes, priority = true) {
-  if (!ipcRenderer || !state.connected) return;
+  if (!ipsApi || !state.connected) return;
   if (!priority) {
     if (priorityQueue.length > 0 || pollQueue.length > 0) return;
     pollQueue.push(frameBytes);
@@ -425,9 +431,9 @@ async function drainTxQueue() {
   if (txDraining) return;
   txDraining = true;
   try {
-    while ((priorityQueue.length > 0 || pollQueue.length > 0) && state.connected && ipcRenderer) {
+    while ((priorityQueue.length > 0 || pollQueue.length > 0) && state.connected && ipsApi) {
       const next = priorityQueue.length > 0 ? priorityQueue.shift() : pollQueue.shift();
-      ipcRenderer.send('serial:send', Array.from(next));
+      ipsApi.send(Array.from(next));
       await new Promise(r => setTimeout(r, 45));
     }
   } finally {
@@ -510,11 +516,17 @@ function applyTelemetry(data) {
   if (data.serial !== undefined && data.serial.length > 0) state.deviceInfo.serial = data.serial;
 
   // Hardware Protection Limits
-  if (data.ovpLimit !== undefined && data.ovpLimit > 0) state.protectionLimits.ovp = data.ovpLimit;
-  if (data.ocpLimit !== undefined && data.ocpLimit > 0) state.protectionLimits.ocp = data.ocpLimit;
-  if (data.oppLimit !== undefined && data.oppLimit > 0) state.protectionLimits.opp = data.oppLimit;
-  if (data.otpLimit !== undefined && data.otpLimit > 0) state.protectionLimits.otp = data.otpLimit;
-  if (data.lvpLimit !== undefined) state.protectionLimits.lvp = data.lvpLimit;
+  let hasLimitsUpdate = false;
+  if (data.ovpLimit !== undefined && data.ovpLimit > 0) { state.protectionLimits.ovp = data.ovpLimit; hasLimitsUpdate = true; }
+  if (data.ocpLimit !== undefined && data.ocpLimit > 0) { state.protectionLimits.ocp = data.ocpLimit; hasLimitsUpdate = true; }
+  if (data.oppLimit !== undefined && data.oppLimit > 0) { state.protectionLimits.opp = data.oppLimit; hasLimitsUpdate = true; }
+  if (data.otpLimit !== undefined && data.otpLimit > 0) { state.protectionLimits.otp = data.otpLimit; hasLimitsUpdate = true; }
+  if (data.lvpLimit !== undefined) { state.protectionLimits.lvp = data.lvpLimit; hasLimitsUpdate = true; }
+
+  if (hasLimitsUpdate && state.awaitingLimitsRefresh) {
+    state.awaitingLimitsRefresh = false;
+    updateProtectionModalInputs();
+  }
 
   if (data.protection !== undefined) {
     state.protection = data.protection;
@@ -689,9 +701,10 @@ async function triggerBootloader() {
   if (!confirmed) return;
 
   if (state.connected) {
-    await sendFrame(IPS3608Protocol.enterBootloader());
+    ensurePcControlMode();
+    sendFrame(IPS3608Protocol.enterBootloader(), true);
     setTimeout(() => {
-      disconnectSerial();
+      disconnectSerial(true);
     }, 300);
   }
 }
@@ -713,7 +726,8 @@ function openProtectionModal() {
   elements.modalProtectionSettings.classList.remove('hidden');
 
   if (state.connected) {
-    sendFrame(IPS3608Protocol.queryAll());
+    state.awaitingLimitsRefresh = true;
+    sendFrame(IPS3608Protocol.queryAll(), true);
   }
 }
 
@@ -723,7 +737,8 @@ function closeProtectionModal() {
 
 async function refreshProtectionLimits() {
   if (state.connected) {
-    await sendFrame(IPS3608Protocol.queryAll());
+    state.awaitingLimitsRefresh = true;
+    sendFrame(IPS3608Protocol.queryAll(), true);
   }
   updateProtectionModalInputs();
   if (elements.protectionSaveFeedback) {
@@ -763,8 +778,11 @@ async function saveProtectionLimits() {
 }
 
 // ==========================================================================
-// 60 FPS Canvas Oscilloscope Waveform Renderer
+// Canvas Oscilloscope Waveform Renderer (Throttled / Demand-Driven)
 // ==========================================================================
+
+let scopeNeedsRedraw = true;
+let lastScopeDrawTime = 0;
 
 function recordHistoryPoint() {
   const now = Date.now();
@@ -778,6 +796,7 @@ function recordHistoryPoint() {
   while (state.history.length > 0 && state.history[0].time < cutoff) {
     state.history.shift();
   }
+  scopeNeedsRedraw = true;
 
   if (state.logging) {
     state.logData.push({
@@ -791,9 +810,24 @@ function recordHistoryPoint() {
   }
 }
 
-function drawScope() {
+function drawScope(ts = 0) {
   const canvas = elements.scopeCanvas;
   if (!canvas) return;
+
+  if (typeof document !== 'undefined' && document.hidden) {
+    requestAnimationFrame(drawScope);
+    return;
+  }
+
+  const shouldRedraw = scopeNeedsRedraw || (state.connected && state.history.length >= 2 && (ts - lastScopeDrawTime >= 50));
+  if (!shouldRedraw) {
+    requestAnimationFrame(drawScope);
+    return;
+  }
+
+  scopeNeedsRedraw = false;
+  lastScopeDrawTime = ts;
+
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
@@ -871,6 +905,7 @@ function resizeCanvas() {
   if (container) {
     elements.scopeCanvas.width = container.clientWidth;
     elements.scopeCanvas.height = container.clientHeight;
+    scopeNeedsRedraw = true;
   }
 }
 
@@ -891,7 +926,7 @@ function updateUpdaterUI() {
 }
 
 async function handleUpdateButtonClick() {
-  if (!ipcRenderer || state.updating) return;
+  if (!ipsApi || state.updating) return;
 
   if (state.updateInfo && state.updateInfo.available && state.updateInfo.asset) {
     const ok = confirm(t('updater.confirm', { version: state.updateInfo.latestVersion }));
@@ -899,7 +934,7 @@ async function handleUpdateButtonClick() {
     state.updating = true;
     elements.btnCheckUpdateText.textContent = t('updater.downloading', { pct: 0 });
     try {
-      await ipcRenderer.invoke('updater:install', state.updateInfo.asset);
+      await ipsApi.installUpdate();
     } catch (err) {
       state.updating = false;
       updateUpdaterUI();
@@ -910,7 +945,7 @@ async function handleUpdateButtonClick() {
 
   elements.btnCheckUpdateText.textContent = t('updater.checking');
   try {
-    const info = await ipcRenderer.invoke('updater:check');
+    const info = await ipsApi.checkForUpdates();
     if (info && info.error) {
       alert(t('updater.error', { message: info.error }));
       updateUpdaterUI();
@@ -932,6 +967,7 @@ async function handleUpdateButtonClick() {
 
 function refreshDynamicTexts() {
   updateConnectionUI(state.connected);
+  syncUsbLedFromState();
   updateKeyLockUI();
   updateUpdaterUI();
   updateOutputState(state.outputOn);
@@ -940,7 +976,6 @@ function refreshDynamicTexts() {
   elements.logCounter.textContent = state.logData.length > 0
     ? t('scope.log_count', { count: state.logData.length })
     : t('scope.log_count_init');
-  refreshPortList();
 }
 
 function initLanguage() {
@@ -980,28 +1015,28 @@ function initEvents() {
     });
   }
 
-  // Native Serial & Updater IPC Listeners
+  // Native Serial & Updater Preload Bridge Listeners
   if (elements.btnCheckUpdate) {
     elements.btnCheckUpdate.addEventListener('click', handleUpdateButtonClick);
   }
 
-  if (ipcRenderer) {
-    ipcRenderer.on('updater:available', (event, info) => {
+  if (ipsApi) {
+    ipsApi.onUpdaterAvailable((info) => {
       state.updateInfo = info;
       updateUpdaterUI();
     });
 
-    ipcRenderer.on('updater:progress', (event, pct) => {
+    ipsApi.onUpdaterProgress((pct) => {
       if (elements.btnCheckUpdateText) {
         elements.btnCheckUpdateText.textContent = t('updater.downloading', { pct });
       }
     });
 
-    ipcRenderer.on('serial:rx', (event, bytes) => {
+    ipsApi.onSerialRx((bytes) => {
       handleIncomingBytes(new Uint8Array(bytes));
     });
 
-    ipcRenderer.on('serial:status', (event, status) => {
+    ipsApi.onSerialStatus((status) => {
       if (status.connected) {
         onSerialConnected(status.port);
       } else {
@@ -1060,6 +1095,7 @@ function initEvents() {
   // Scope Timebase
   elements.timebaseSelect.addEventListener('change', (e) => {
     state.timebaseSeconds = parseInt(e.target.value, 10);
+    scopeNeedsRedraw = true;
   });
 
   // Data Logger

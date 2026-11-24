@@ -5,6 +5,7 @@ const updater = require('./updater');
 const pkg = require('../package.json');
 
 let mainWindow;
+let lastUpdateInfo = null;
 const serialManager = new SerialManager();
 
 function createWindow() {
@@ -17,8 +18,9 @@ function createWindow() {
     icon: path.join(__dirname, '../assets/icon.png'),
     backgroundColor: '#0a0e17',
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
       backgroundThrottling: false
     },
     autoHideMenuBar: true
@@ -31,6 +33,7 @@ function createWindow() {
     setTimeout(async () => {
       try {
         const info = await updater.checkForUpdates(pkg.version);
+        lastUpdateInfo = info;
         if (info.available && mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('updater:available', info);
         }
@@ -46,15 +49,20 @@ function createWindow() {
 
 ipcMain.handle('updater:check', async () => {
   try {
-    return await updater.checkForUpdates(pkg.version);
+    const info = await updater.checkForUpdates(pkg.version);
+    lastUpdateInfo = info;
+    return info;
   } catch (err) {
     return { available: false, error: err.message, currentVersion: pkg.version };
   }
 });
 
-ipcMain.handle('updater:install', async (event, asset) => {
+ipcMain.handle('updater:install', async () => {
+  if (!lastUpdateInfo || !lastUpdateInfo.available || !lastUpdateInfo.asset) {
+    throw new Error('No verified update available');
+  }
   return await updater.downloadAndInstall(
-    asset,
+    lastUpdateInfo.asset,
     (pct) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('updater:progress', pct);
@@ -69,7 +77,7 @@ ipcMain.handle('serial:scan-ports', async () => {
 });
 
 ipcMain.handle('serial:connect', (event, portName) => {
-  if (!portName) return false;
+  if (!SerialManager.isValidComPort(portName)) return false;
   serialManager.connect(
     portName,
     (bytes) => {

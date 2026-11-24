@@ -5,6 +5,18 @@ const os = require('os');
 const { spawn } = require('child_process');
 
 const GITHUB_API_URL = 'https://api.github.com/repos/Daddelgreis74/fnirsi-ips3608-studio/releases/latest';
+const MAX_REDIRECTS = 5;
+
+function isAllowedDownloadUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || ''));
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === 'github.com' || host === 'api.github.com' || host.endsWith('.githubusercontent.com');
+  } catch (e) {
+    return false;
+  }
+}
 
 function parseSemver(v) {
   const clean = String(v || '').replace(/^v/i, '').split('-')[0];
@@ -33,8 +45,14 @@ function pickAsset(assets, isPortable) {
   return exes.find((a) => !a.name.toLowerCase().includes('portable')) || exes[0] || null;
 }
 
-function fetchJson(url) {
+function fetchJson(url, redirects = 0) {
   return new Promise((resolve, reject) => {
+    if (!isAllowedDownloadUrl(url)) {
+      return reject(new Error('Disallowed URL'));
+    }
+    if (redirects > MAX_REDIRECTS) {
+      return reject(new Error('Too many redirects'));
+    }
     const req = https.get(
       url,
       {
@@ -47,7 +65,7 @@ function fetchJson(url) {
       (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          return resolve(fetchJson(res.headers.location));
+          return resolve(fetchJson(res.headers.location, redirects + 1));
         }
         if (res.statusCode !== 200) {
           res.resume();
@@ -72,8 +90,14 @@ function fetchJson(url) {
   });
 }
 
-function downloadFile(url, destPath, onProgress) {
+function downloadFile(url, destPath, onProgress, redirects = 0) {
   return new Promise((resolve, reject) => {
+    if (!isAllowedDownloadUrl(url)) {
+      return reject(new Error('Disallowed download URL'));
+    }
+    if (redirects > MAX_REDIRECTS) {
+      return reject(new Error('Too many redirects'));
+    }
     const req = https.get(
       url,
       {
@@ -83,7 +107,7 @@ function downloadFile(url, destPath, onProgress) {
       (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          return resolve(downloadFile(res.headers.location, destPath, onProgress));
+          return resolve(downloadFile(res.headers.location, destPath, onProgress, redirects + 1));
         }
         if (res.statusCode !== 200) {
           res.resume();
@@ -92,20 +116,23 @@ function downloadFile(url, destPath, onProgress) {
         const total = parseInt(res.headers['content-length'] || '0', 10);
         let downloaded = 0;
         const file = fs.createWriteStream(destPath);
+        const cleanupError = (err) => {
+          file.destroy();
+          fs.unlink(destPath, () => {});
+          reject(err);
+        };
         res.on('data', (chunk) => {
           downloaded += chunk.length;
           if (onProgress && total > 0) {
             onProgress(Math.min(100, Math.round((downloaded / total) * 100)));
           }
         });
+        res.on('error', cleanupError);
         res.pipe(file);
         file.on('finish', () => {
           file.close(() => resolve(destPath));
         });
-        file.on('error', (err) => {
-          fs.unlink(destPath, () => {});
-          reject(err);
-        });
+        file.on('error', cleanupError);
       }
     );
     req.on('error', reject);
@@ -172,6 +199,7 @@ async function downloadAndInstall(asset, onProgress, app) {
 module.exports = {
   compareSemver,
   pickAsset,
+  isAllowedDownloadUrl,
   checkForUpdates,
   downloadAndInstall
 };

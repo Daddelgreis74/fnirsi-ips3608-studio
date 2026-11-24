@@ -220,8 +220,8 @@ class IPS3608Protocol {
     const vReg = 0xC3 + (2 * s);
     const aReg = vReg + 1;
     return {
-      vFrame: this.buildFrame(CmdType.WRITE, vReg, this.floatToBytes(voltage)),
-      aFrame: this.buildFrame(CmdType.WRITE, aReg, this.floatToBytes(current))
+      vFrame: this.buildFrame(CmdType.WRITE_BYTE, vReg, this.floatToBytes(voltage)),
+      aFrame: this.buildFrame(CmdType.WRITE_BYTE, aReg, this.floatToBytes(current))
     };
   }
 

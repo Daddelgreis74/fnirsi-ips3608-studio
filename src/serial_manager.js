@@ -8,6 +8,10 @@ const FNIRSI_VID = '2e3c';
 const KNOWN_USB_VIDS = new Set(['2e3c', '1a86', '10c4', '0403', '0483', '067b']);
 
 class SerialManager {
+  static isValidComPort(portName) {
+    return /^COM\d+$/i.test(String(portName || '').trim());
+  }
+
   constructor() {
     this.worker = null;
     this.connected = false;
@@ -76,9 +80,15 @@ class SerialManager {
       this.disconnect();
     }
 
+    const cleanPort = String(portName || '').trim().toUpperCase();
+    if (!SerialManager.isValidComPort(cleanPort)) {
+      if (onStatus) onStatus({ connected: false, port: null, error: 'Invalid COM port' });
+      return;
+    }
+
     this.onDataCallback = onData;
     this.onStatusCallback = onStatus;
-    this.currentPort = portName;
+    this.currentPort = cleanPort;
 
     const psScript = `
 $code = @'
@@ -173,7 +183,7 @@ public class Ips3608SerialWorker {
 }
 '@
 Add-Type -TypeDefinition $code
-[Ips3608SerialWorker]::Run("${portName}")
+[Ips3608SerialWorker]::Run("${cleanPort}")
 `;
 
     try {

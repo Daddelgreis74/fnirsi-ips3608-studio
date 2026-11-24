@@ -149,54 +149,6 @@ body {
   gap: 12px;
 }
 
-.sim-toggle-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.port-select-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.port-select {
-  background: rgba(18, 28, 48, 0.8);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  outline: none;
-  cursor: pointer;
-  min-width: 180px;
-}
-
-.port-select:focus {
-  border-color: var(--color-cyan);
-}
-
-.icon-btn {
-  background: rgba(18, 28, 48, 0.8);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-  border-radius: 6px;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-.icon-btn:hover {
-  border-color: var(--color-cyan);
-  background: rgba(25, 40, 70, 0.9);
-}
-
 .btn {
   padding: 7px 16px;
   border-radius: 6px;
@@ -210,21 +162,6 @@ body {
   transition: all 0.25s ease;
 }
 
-.btn-connect {
-  background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
-  color: white;
-  box-shadow: 0 2px 10px rgba(0, 180, 216, 0.35);
-}
-.btn-connect:hover {
-  background: linear-gradient(135deg, #00d4ff 0%, #0096c7 100%);
-  box-shadow: 0 4px 16px rgba(0, 212, 255, 0.5);
-  transform: translateY(-1px);
-}
-.btn-disconnect {
-  background: linear-gradient(135deg, #ff3366 0%, #c9184a 100%);
-  color: white;
-  box-shadow: 0 2px 10px rgba(255, 51, 102, 0.35);
-}
 
 /* ==========================================================================
    Studio Grid Workspace
@@ -850,29 +787,6 @@ body {
   opacity: 0.4;
   cursor: not-allowed;
 }
-
-/* Toggle Switch */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 32px;
-  height: 18px;
-}
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider.round {
-  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(255, 255, 255, 0.1);
-  transition: .3s;
-  border-radius: 18px;
-}
-.slider.round:before {
-  position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px;
-  background-color: white;
-  transition: .3s;
-  border-radius: 50%;
-}
-input:checked + .slider.round { background-color: var(--color-cyan); }
-input:checked + .slider.round:before { transform: translateX(14px); }
 
 
 /* ==========================================================================

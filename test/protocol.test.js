@@ -1,5 +1,7 @@
 const assert = require('assert');
 const { CmdType, Register, ProtectionCode, IPS3608Protocol } = require('../src/renderer/protocol');
+const SerialManager = require('../src/serial_manager');
+const updater = require('../src/updater');
 
 console.log('Running FNIRSI IPS3608 Protocol Tests...');
 
@@ -198,9 +200,39 @@ console.log('Running FNIRSI IPS3608 Protocol Tests...');
   assert.strictEqual(brFrame[5], (0xD6 + 1 + 15) & 0xFF);
 
   const p2 = IPS3608Protocol.setDevicePreset(2, 12.0, 3.0);
+  assert.strictEqual(p2.vFrame[1], CmdType.WRITE_BYTE);
+  assert.strictEqual(p2.aFrame[1], CmdType.WRITE_BYTE);
   assert.strictEqual(p2.vFrame[2], 0xC7); // M2 V
   assert.strictEqual(p2.aFrame[2], 0xC8); // M2 A
   console.log('✓ Display Brightness (0xD6) & Hardware Preset (M1-M6) frames verified');
+}
+
+// 12. Test SerialManager COM Port Allowlist Validation
+{
+  assert.strictEqual(SerialManager.isValidComPort('COM5'), true);
+  assert.strictEqual(SerialManager.isValidComPort('com12'), true);
+  assert.strictEqual(SerialManager.isValidComPort('COM5; calc'), false);
+  assert.strictEqual(SerialManager.isValidComPort('COM'), false);
+  assert.strictEqual(SerialManager.isValidComPort('../COM1'), false);
+  assert.strictEqual(SerialManager.isValidComPort(''), false);
+  console.log('✓ SerialManager COM port allowlist validation verified');
+}
+
+// 13. Test Updater Semver Comparison & Download URL Allowlist
+{
+  assert.strictEqual(updater.compareSemver('v1.6.0', '1.5.1'), 1);
+  assert.strictEqual(updater.compareSemver('1.5.1', '1.5.1'), 0);
+  assert.strictEqual(
+    updater.isAllowedDownloadUrl('https://github.com/Daddelgreis74/fnirsi-ips3608-studio/releases/download/v1.5.1/app.exe'),
+    true
+  );
+  assert.strictEqual(
+    updater.isAllowedDownloadUrl('https://objects.githubusercontent.com/release/app.exe'),
+    true
+  );
+  assert.strictEqual(updater.isAllowedDownloadUrl('http://github.com/file.exe'), false);
+  assert.strictEqual(updater.isAllowedDownloadUrl('https://evil.com/file.exe'), false);
+  console.log('✓ Updater semver & HTTPS GitHub allowlist verified');
 }
 
 console.log('\nAll protocol tests passed cleanly!');
