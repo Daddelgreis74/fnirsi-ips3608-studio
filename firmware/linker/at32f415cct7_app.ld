@@ -86,11 +86,4 @@ SECTIONS
 
   PROVIDE(end = _ebss);
   PROVIDE(_end = _ebss);
-
-  /DISCARD/ :
-  {
-    libc.a(*)
-    libm.a(*)
-    libgcc.a(*)
-  }
 }
