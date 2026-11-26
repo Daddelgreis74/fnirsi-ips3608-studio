@@ -2,6 +2,9 @@
  * FNIRSI IPS3608 Studio - Main Renderer Application
  */
 
+(function () {
+  'use strict';
+
 const ipsApi = (typeof window !== 'undefined' && window.ipsApi) ? window.ipsApi : null;
 
 // ==========================================================================
@@ -37,6 +40,9 @@ const state = {
   readBuffer: new Uint8Array(0),
   pnpPorts: [],
   awaitingLimitsRefresh: false,
+  webSerialPort: null,
+  webSerialReader: null,
+  webSerialWriter: null,
 
   // Data Logger
   logging: false,
@@ -206,10 +212,140 @@ async function refreshPortList() {
 }
 
 let connectTimeoutTimer = null;
+const KNOWN_WEB_SERIAL_VIDS = new Set([0x2e3c, 0x1a86, 0x10c4, 0x0403, 0x0483, 0x067b]);
+
+function hasWebSerial() {
+  return typeof navigator !== 'undefined' && 'serial' in navigator;
+}
+
+function isIpsWebSerialPort(port) {
+  if (!port || typeof port.getInfo !== 'function') return false;
+  const info = port.getInfo() || {};
+  return info.usbVendorId === 0x2e3c || KNOWN_WEB_SERIAL_VIDS.has(info.usbVendorId);
+}
+
+function resolveWebSerialLabel(port) {
+  const info = (port && typeof port.getInfo === 'function') ? (port.getInfo() || {}) : {};
+  const vidHex = info.usbVendorId ? info.usbVendorId.toString(16).padStart(4, '0') : '';
+  if (vidHex && Array.isArray(state.pnpPorts)) {
+    const match = state.pnpPorts.find(p => p.vid === vidHex);
+    if (match && match.comPort) return match.comPort;
+  }
+  if (info.usbVendorId === 0x2e3c) return 'IPS3608 USB';
+  return 'USB';
+}
+
+async function writeSerialBytes(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (state.webSerialWriter) {
+    await state.webSerialWriter.write(payload);
+    return;
+  }
+  if (ipsApi) {
+    ipsApi.send(Array.from(payload));
+  }
+}
+
+async function startWebSerialReadLoop(readable) {
+  if (!readable) return;
+  const reader = readable.getReader();
+  state.webSerialReader = reader;
+  try {
+    while (state.connected || state.connecting) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value && value.length > 0) {
+        handleIncomingBytes(value);
+      }
+    }
+  } catch (err) {
+    if (state.connected) {
+      console.warn('Web Serial read error:', err.message);
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {}
+    if (state.webSerialReader === reader) {
+      state.webSerialReader = null;
+    }
+    if (state.connected) {
+      await disconnectSerial(true);
+    }
+  }
+}
+
+async function openWebSerialPort(port) {
+  await port.open({ baudRate: 115200 });
+  try {
+    await port.setSignals({ dataTerminalReady: true, requestToSend: false }).catch(() => {});
+    state.webSerialPort = port;
+    state.webSerialWriter = port.writable ? port.writable.getWriter() : null;
+  } catch (err) {
+    state.webSerialPort = null;
+    state.webSerialWriter = null;
+    await port.close().catch(() => {});
+    throw err;
+  }
+
+  const label = resolveWebSerialLabel(port);
+  state.readBuffer = new Uint8Array(0);
+  startWebSerialReadLoop(port.readable);
+  await onSerialConnected(label);
+}
+
+async function connectWebSerial(silent = false) {
+  if (state.connecting || !hasWebSerial()) return;
+  state.connecting = true;
+  state.manualDisconnect = false;
+  state.silentConnect = silent;
+  updateUsbLedUI('connecting', 'USB');
+
+  try {
+    if (typeof navigator.serial.getPorts === 'function') {
+      const granted = await navigator.serial.getPorts();
+      const sorted = [...granted].sort((a, b) => {
+        const ai = (a.getInfo && a.getInfo().usbVendorId === 0x2e3c) ? 1 : 0;
+        const bi = (b.getInfo && b.getInfo().usbVendorId === 0x2e3c) ? 1 : 0;
+        return bi - ai;
+      });
+      const known = sorted.find(isIpsWebSerialPort) || sorted[0];
+      if (known) {
+        try {
+          await openWebSerialPort(known);
+          return;
+        } catch (_err) {
+          // Fall through to requestPort if previously granted handle failed to reopen
+        }
+      }
+    }
+
+    if (ipsApi && typeof ipsApi.setAutoSelect === 'function') {
+      await ipsApi.setAutoSelect(true).catch(() => {});
+    }
+    const port = await navigator.serial.requestPort();
+    await openWebSerialPort(port);
+  } catch (err) {
+    console.warn('Web Serial connect failed:', err && err.name, err && err.message);
+    state.connecting = false;
+    updateConnectionUI(false);
+    if (!silent && err && err.name !== 'NotFoundError') {
+      alert(t('dialog.connect_error', { message: err.message }));
+    }
+  } finally {
+    state.connecting = false;
+  }
+}
 
 async function autoScanAndConnect() {
-  if (state.connected || state.connecting || state.manualDisconnect || !ipsApi) return;
+  if (state.connected || state.connecting || state.manualDisconnect) return;
 
+  if (hasWebSerial()) {
+    await connectWebSerial(true);
+    return;
+  }
+
+  if (!ipsApi) return;
   try {
     const pnpPorts = await scanSystemComPorts();
     const fnirsiOrUsb = pnpPorts.find(p => p.isFnirsi) || pnpPorts.find(p => p.isKnownUsb || p.isUsb);
@@ -230,6 +366,11 @@ async function connectSerial(silent = false, explicitPort = null) {
     return;
   }
 
+  if (hasWebSerial() && !explicitPort) {
+    await connectWebSerial(silent);
+    return;
+  }
+
   if (state.connecting || !ipsApi) return;
   state.connecting = true;
   state.manualDisconnect = false;
@@ -243,7 +384,7 @@ async function connectSerial(silent = false, explicitPort = null) {
       ipsApi.disconnect().catch(() => {});
       updateConnectionUI(false);
     }
-  }, 7000);
+  }, 12000);
 
   try {
     let targetPort = explicitPort;
@@ -360,15 +501,29 @@ async function disconnectSerial(skipUnlock = false) {
   clearTxQueues();
 
   // Send official disconnect/unlock packet (CMD_2: F1 C1 00 01 00 01) directly before closing
-  if (!skipUnlock && state.connected && ipsApi) {
+  if (!skipUnlock && state.connected) {
     try {
-      ipsApi.send(Array.from(IPS3608Protocol.disconnectPacket()));
+      await writeSerialBytes(IPS3608Protocol.disconnectPacket());
       await new Promise(r => setTimeout(r, 60));
     } catch (e) {}
   }
 
   state.connected = false;
   state.connecting = false;
+
+  if (state.webSerialReader) {
+    try { await state.webSerialReader.cancel(); } catch (e) {}
+    state.webSerialReader = null;
+  }
+  if (state.webSerialWriter) {
+    try { await state.webSerialWriter.close(); } catch (e) {}
+    try { state.webSerialWriter.releaseLock(); } catch (e) {}
+    state.webSerialWriter = null;
+  }
+  if (state.webSerialPort) {
+    try { await state.webSerialPort.close(); } catch (e) {}
+    state.webSerialPort = null;
+  }
 
   if (ipsApi) {
     try {
@@ -417,7 +572,7 @@ function clearTxQueues() {
 }
 
 function sendFrame(frameBytes, priority = true) {
-  if (!ipsApi || !state.connected) return;
+  if (!state.connected || (!state.webSerialWriter && !ipsApi)) return;
   if (!priority) {
     if (priorityQueue.length > 0 || pollQueue.length > 0) return;
     pollQueue.push(frameBytes);
@@ -431,9 +586,9 @@ async function drainTxQueue() {
   if (txDraining) return;
   txDraining = true;
   try {
-    while ((priorityQueue.length > 0 || pollQueue.length > 0) && state.connected && ipsApi) {
+    while ((priorityQueue.length > 0 || pollQueue.length > 0) && state.connected && (state.webSerialWriter || ipsApi)) {
       const next = priorityQueue.length > 0 ? priorityQueue.shift() : pollQueue.shift();
-      ipsApi.send(Array.from(next));
+      await writeSerialBytes(next);
       await new Promise(r => setTimeout(r, 45));
     }
   } finally {
@@ -1166,6 +1321,19 @@ function initEvents() {
   }
 
   // Initial port scan & automatic connection, plus periodic background scan when disconnected
+  if (hasWebSerial()) {
+    navigator.serial.addEventListener('connect', () => {
+      if (!state.connected && !state.connecting && !state.manualDisconnect) {
+        autoScanAndConnect();
+      }
+    });
+    navigator.serial.addEventListener('disconnect', (event) => {
+      if (state.webSerialPort && event.target === state.webSerialPort) {
+        disconnectSerial(true);
+      }
+    });
+  }
+
   autoScanAndConnect();
   setInterval(() => {
     if (!state.connected && !state.connecting && !state.manualDisconnect) {
@@ -1189,3 +1357,4 @@ function exportCsv() {
 
 // Start
 document.addEventListener('DOMContentLoaded', initEvents);
+})();

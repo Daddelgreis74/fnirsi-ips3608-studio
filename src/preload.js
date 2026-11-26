@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('ipsApi', {
+  setAutoSelect: (enabled) => ipcRenderer.invoke('serial:set-auto-select', enabled),
   scanPorts: () => ipcRenderer.invoke('serial:scan-ports'),
   connect: (portName) => ipcRenderer.invoke('serial:connect', portName),
   disconnect: () => ipcRenderer.invoke('serial:disconnect'),

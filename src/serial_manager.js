@@ -1,7 +1,7 @@
 // FNIRSI IPS3608 Studio - Native Windows Serial Manager
 // Automatic COM port detection and full-duplex .NET SerialPort worker for binary USB-CDC communication
 
-const { spawn, exec } = require('child_process');
+const { spawn, execFile } = require('child_process');
 
 // 2E3C = Artery AT32 USB-CDC (FNIRSI IPS3608 / 2C23T), plus common USB-UART chips
 const FNIRSI_VID = '2e3c';
@@ -29,8 +29,8 @@ class SerialManager {
         this._scanPromise = null;
         return resolve([]);
       }
-      const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match '\\(COM\\d+\\)' } | Select-Object Name, DeviceID | ConvertTo-Json -Compress"`;
-      exec(cmd, { timeout: 3500 }, (err, stdout) => {
+      const psCmd = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $ProgressPreference = 'SilentlyContinue'; Get-CimInstance Win32_PnPEntity -Filter \"Name LIKE '%(COM%)'\" | Select-Object Name, DeviceID | ConvertTo-Json -Compress";
+      execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCmd], { timeout: 6000, windowsHide: true }, (err, stdout) => {
         this._scanPromise = null;
         if (err || !stdout || !stdout.trim()) return resolve([]);
         try {
@@ -90,110 +90,105 @@ class SerialManager {
     this.onStatusCallback = onStatus;
     this.currentPort = cleanPort;
 
-    const psScript = `
-$code = @'
-using System;
-using System.IO.Ports;
-using System.Threading;
+    const psScript = [
+      "$ProgressPreference = 'SilentlyContinue'",
+      "$ErrorActionPreference = 'Stop'",
+      "$port = $null",
+      "$psIn = $null",
+      "$rs = $null",
+      "$running = [ref]$true",
+      "try {",
+      `  $port = New-Object System.IO.Ports.SerialPort '${cleanPort}', 115200, 'None', 8, 'One'`,
+      "  $port.DtrEnable = $true",
+      "  $port.RtsEnable = $false",
+      "  $port.ReadTimeout = 25",
+      "  $port.WriteTimeout = 1000",
+      "  $port.Open()",
+      `  [Console]::WriteLine('[CONNECTED]:${cleanPort}')`,
+      "  [Console]::Out.Flush()",
+      "  $queue = [System.Collections.Concurrent.ConcurrentQueue[string]]::new()",
+      "  $rs = [runspacefactory]::CreateRunspace()",
+      "  $rs.Open()",
+      "  $psIn = [powershell]::Create()",
+      "  $psIn.Runspace = $rs",
+      "  [void]$psIn.AddScript({",
+      "    param($q, $run)",
+      "    while ($run.Value) {",
+      "      try {",
+      "        $line = [Console]::In.ReadLine()",
+      "        if ($null -eq $line) { $q.Enqueue('QUIT'); break }",
+      "        $q.Enqueue($line)",
+      "        if ($line.Trim() -eq 'QUIT') { break }",
+      "      } catch {",
+      "        $q.Enqueue('QUIT')",
+      "        break",
+      "      }",
+      "    }",
+      "  }).AddArgument($queue).AddArgument($running)",
+      "  [void]$psIn.BeginInvoke()",
+      "  $buf = New-Object byte[] 512",
+      "  while ($running.Value -and $port.IsOpen) {",
+      "    $cmd = $null",
+      "    while ($queue.TryDequeue([ref]$cmd)) {",
+      "      $hex = $cmd.Trim()",
+      "      if ($hex -eq 'QUIT') { $running.Value = $false; break }",
+      "      if ($hex.Length -ge 2 -and ($hex.Length % 2 -eq 0)) {",
+      "        try {",
+      "          $bytes = New-Object byte[] ($hex.Length / 2)",
+      "          for ($i = 0; $i -lt $bytes.Length; $i++) {",
+      "            $bytes[$i] = [Convert]::ToByte($hex.Substring($i * 2, 2), 16)",
+      "          }",
+      "          $port.Write($bytes, 0, $bytes.Length)",
+      "        } catch {",
+      "          [Console]::WriteLine('[ERR_TX]:' + $_.Exception.Message)",
+      "          [Console]::Out.Flush()",
+      "          $running.Value = $false",
+      "          break",
+      "        }",
+      "      }",
+      "    }",
+      "    if (-not $running.Value) { break }",
+      "    try {",
+      "      $n = $port.Read($buf, 0, $buf.Length)",
+      "      if ($n -gt 0) {",
+      "        [Console]::WriteLine('[RX]:' + [BitConverter]::ToString($buf, 0, $n).Replace('-', ''))",
+      "        [Console]::Out.Flush()",
+      "      }",
+      "    } catch [System.TimeoutException] {",
+      "    } catch {",
+      "      [Console]::WriteLine('[ERR_RX]:' + $_.Exception.Message)",
+      "      [Console]::Out.Flush()",
+      "      break",
+      "    }",
+      "  }",
+      "} catch {",
+      "  [Console]::WriteLine('[ERR_OPEN]:' + $_.Exception.Message)",
+      "  [Console]::Out.Flush()",
+      "} finally {",
+      "  $running.Value = $false",
+      "  if ($port -ne $null) {",
+      "    try { if ($port.IsOpen) { $port.Close() } } catch {}",
+      "    try { $port.Dispose() } catch {}",
+      "  }",
+      "  if ($psIn -ne $null) { try { $psIn.Dispose() } catch {} }",
+      "  if ($rs -ne $null) { try { $rs.Close(); $rs.Dispose() } catch {} }",
+      "  [Console]::WriteLine('[DISCONNECTED]')",
+      "  [Console]::Out.Flush()",
+      "}"
+    ].join('\n');
 
-public class Ips3608SerialWorker {
-    private static SerialPort port;
-    private static volatile bool running = true;
-    private static readonly object txLock = new object();
-
-    private static byte[] HexToBytes(string hex) {
-        int len = hex.Length;
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
-        }
-        return data;
-    }
-
-    public static void Run(string portName) {
-        try {
-            port = new SerialPort(portName, 115200, Parity.None, 8, StopBits.One);
-            port.DtrEnable = true;
-            port.RtsEnable = false;
-            port.ReadTimeout = 400;
-            port.WriteTimeout = 1000;
-            port.Open();
-
-            Console.WriteLine("[CONNECTED]:" + portName);
-            Console.Out.Flush();
-
-            Thread writerThread = new Thread(() => {
-                while (running && port != null && port.IsOpen) {
-                    try {
-                        string cmd = Console.ReadLine();
-                        if (cmd == null || cmd == "QUIT") {
-                            running = false;
-                            break;
-                        }
-                        cmd = cmd.Trim();
-                        if (cmd.Length >= 2 && (cmd.Length % 2 == 0) && port.IsOpen) {
-                            byte[] bytes = HexToBytes(cmd);
-                            lock (txLock) {
-                                if (port != null && port.IsOpen) {
-                                    port.Write(bytes, 0, bytes.Length);
-                                }
-                            }
-                        }
-                    } catch (Exception ex) {
-                        Console.WriteLine("[ERR_TX]:" + ex.Message);
-                        Console.Out.Flush();
-                        running = false;
-                        break;
-                    }
-                }
-            });
-            writerThread.IsBackground = true;
-            writerThread.Start();
-
-            byte[] buf = new byte[512];
-            while (running && port != null && port.IsOpen) {
-                try {
-                    int n = port.Read(buf, 0, buf.Length);
-                    if (n > 0) {
-                        string hex = BitConverter.ToString(buf, 0, n).Replace("-", "");
-                        Console.WriteLine("[RX]:" + hex);
-                        Console.Out.Flush();
-                    }
-                } catch (TimeoutException) {
-                } catch (Exception ex) {
-                    Console.WriteLine("[ERR_RX]:" + ex.Message);
-                    Console.Out.Flush();
-                    running = false;
-                    break;
-                }
-            }
-        } catch (Exception ex) {
-            Console.WriteLine("[ERR_OPEN]:" + ex.Message);
-            Console.Out.Flush();
-        } finally {
-            running = false;
-            if (port != null) {
-                try { if (port.IsOpen) port.Close(); } catch {}
-                try { port.Dispose(); } catch {}
-            }
-            Console.WriteLine("[DISCONNECTED]");
-            Console.Out.Flush();
-        }
-    }
-}
-'@
-Add-Type -TypeDefinition $code
-[Ips3608SerialWorker]::Run("${cleanPort}")
-`;
+    const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
 
     try {
-      this.worker = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], {
+      const proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe']
       });
+      this.worker = proc;
 
       let lineBuffer = '';
-      this.worker.stdout.on('data', (chunk) => {
+      proc.stdout.on('data', (chunk) => {
+        if (this.worker !== proc) return;
         lineBuffer += chunk.toString();
         const lines = lineBuffer.split(/\r?\n/);
         lineBuffer = lines.pop();
@@ -226,11 +221,13 @@ Add-Type -TypeDefinition $code
         }
       });
 
-      this.worker.stderr.on('data', (data) => {
+      proc.stderr.on('data', (data) => {
+        if (this.worker !== proc) return;
         console.warn('[SerialWorker stderr]:', data.toString());
       });
 
-      this.worker.on('exit', () => {
+      proc.on('exit', () => {
+        if (this.worker !== proc) return;
         const wasConnected = this.connected;
         this.connected = false;
         this.worker = null;
